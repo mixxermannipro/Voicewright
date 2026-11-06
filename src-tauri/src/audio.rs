@@ -1,6 +1,6 @@
 use cpal::{
     traits::{DeviceTrait, HostTrait, StreamTrait},
-    Device, FromSample, Sample, SampleFormat, SizedSample,
+    Device, FromSample, SampleFormat, SizedSample,
 };
 use serde::Serialize;
 use std::{
@@ -195,7 +195,9 @@ fn resample(samples: &[f32], rate: usize) -> Vec<f32> {
 pub fn has_voice(samples: &[f32]) -> bool {
     samples.len() >= TARGET_RATE / 4
         && samples
-            .chunks_exact(TARGET_RATE / 50)
+            .as_chunks::<{ TARGET_RATE / 50 }>()
+            .0
+            .iter()
             .filter(|frame| {
                 frame.iter().map(|value| value * value).sum::<f32>() / frame.len() as f32
                     > 0.000_025

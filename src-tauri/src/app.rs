@@ -89,6 +89,7 @@ struct Initial {
     global_supported: bool,
     tray_available: bool,
     model_path: PathBuf,
+    default_prompt: &'static str,
 }
 
 #[tauri::command]
@@ -100,6 +101,7 @@ fn initial(state: State<'_, AppState>) -> Initial {
         global_supported: insertion::global_supported(),
         tray_available: state.tray_available.load(Ordering::Relaxed),
         model_path: state.models(),
+        default_prompt: settings::DEFAULT_PROMPT,
     }
 }
 
@@ -182,13 +184,6 @@ fn save_settings(
     value: Settings,
 ) -> Result<(), String> {
     value.validate()?;
-    for (id, config) in &value.providers {
-        config.validate()?;
-        let serialized = serde_json::to_value(config.provider).map_err(|_| "Invalid provider.")?;
-        if serialized.as_str() != Some(id) {
-            return Err("Invalid provider selection.".into());
-        }
-    }
     let mut inner = state.inner.lock().unwrap();
     if inner.status.phase.busy() {
         return Err("Finish the current dictation before saving settings.".into());
@@ -220,6 +215,9 @@ fn start_session(app: &AppHandle, from_hotkey: bool) -> Result<(), String> {
     let mut inner = state.inner.lock().unwrap();
     if inner.status.phase.busy() {
         return Err("A dictation is already in progress.".into());
+    }
+    if inner.transfer.is_some() && !inner.download.as_ref().is_some_and(|item| item.active) {
+        return Err("Finish importing the model before recording.".into());
     }
     let settings = inner.settings.clone();
     let root = state.models();
@@ -699,16 +697,23 @@ fn tray(app: &AppHandle) -> tauri::Result<()> {
 
 pub fn run() {
     whisper_rs::install_logging_hooks();
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _, _| show(app)))
-        .plugin(tauri_plugin_dialog::init())
-        .plugin(
+        .plugin(tauri_plugin_dialog::init());
+    if insertion::global_supported() {
+        builder = builder.plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, shortcut, event| {
-                    handle_shortcut(app, shortcut, event.state);
+                    let handle = app.clone();
+                    let shortcut = *shortcut;
+                    let _ = app.run_on_main_thread(move || {
+                        handle_shortcut(&handle, &shortcut, event.state)
+                    });
                 })
                 .build(),
-        )
+        );
+    }
+    builder
         .setup(|app| {
             let root = app.path().app_data_dir()?;
             let mut status = Status::default();

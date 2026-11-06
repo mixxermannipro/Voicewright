@@ -116,8 +116,19 @@ impl Settings {
         {
             return Err("Settings exceed the supported size or contain invalid characters.".into());
         }
+        for (id, config) in &self.providers {
+            config.validate()?;
+            let serialized =
+                serde_json::to_value(config.provider).map_err(|_| "Invalid provider.")?;
+            if serialized.as_str() != Some(id) {
+                return Err("Invalid provider selection.".into());
+            }
+        }
         if self.cleanup_mode == CleanupMode::Cloud
-            && !self.providers.contains_key(&self.active_provider)
+            && !self
+                .providers
+                .get(&self.active_provider)
+                .is_some_and(|config| !config.model.trim().is_empty())
         {
             return Err("Configure a provider and model before enabling cloud cleanup.".into());
         }

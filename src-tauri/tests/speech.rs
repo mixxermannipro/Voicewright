@@ -6,6 +6,7 @@ use std::{env, path::Path, sync::atomic::AtomicBool};
 #[test]
 #[ignore = "requires verified local model and generated fixtures; see docs/TESTING.md"]
 fn recognizes_german_and_english_locally() {
+    whisper_rs::install_logging_hooks();
     let model = env::var("VOXTAKT_WHISPER_MODEL").unwrap();
     let fixtures = env::var("VOXTAKT_FIXTURES").unwrap();
     for (language, expected) in [("de", "morgen"), ("en", "morning")] {
