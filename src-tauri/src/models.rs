@@ -78,8 +78,69 @@ fn imported(kind: Kind) -> (&'static str, &'static str, &'static [u8; 4], u64) {
     }
 }
 
+fn kind_of(id: &str) -> Result<Kind, String> {
+    for kind in [Kind::Speech, Kind::Cleanup] {
+        if imported(kind).0 == id {
+            return Ok(kind);
+        }
+    }
+    catalog_entry(id).map(|entry| entry.kind)
+}
+
 pub fn valid_id(id: &str, kind: Kind) -> bool {
-    id == imported(kind).0 || catalog_entry(id).is_ok_and(|entry| entry.kind == kind)
+    kind_of(id).is_ok_and(|current| current == kind)
+}
+
+const HEADER_BYTES: usize = 24;
+const MIN_MODEL_BYTES: u64 = 1024;
+const MAX_HEADER_ENTRIES: u64 = 1_000_000;
+
+fn invalid_model(message: &str) -> String {
+    format!("{message} Download or import the model again.")
+}
+
+fn validate_header(kind: Kind, header: &[u8; HEADER_BYTES], size: u64) -> Result<(), String> {
+    let magic = &header[..4];
+    match kind {
+        Kind::Speech => {
+            if magic != b"lmgg" {
+                return Err(if magic == b"GGUF" {
+                    "This is a GGUF file. Whisper needs a GGML model.".into()
+                } else {
+                    "The model has the wrong file format.".into()
+                });
+            }
+            let vocabulary = i32::from_le_bytes(header[4..8].try_into().unwrap());
+            if !(1_000..=1_000_000).contains(&vocabulary) {
+                return Err("The Whisper model header is invalid.".into());
+            }
+        }
+        Kind::Cleanup => {
+            if magic != b"GGUF" {
+                return Err(if magic == b"lmgg" {
+                    "This is a Whisper GGML file. Local cleanup needs a GGUF model.".into()
+                } else {
+                    "The model has the wrong file format.".into()
+                });
+            }
+            let version = u32::from_le_bytes(header[4..8].try_into().unwrap());
+            if !(1..=3).contains(&version) {
+                return Err("The GGUF model version is not supported.".into());
+            }
+            let tensors = u64::from_le_bytes(header[8..16].try_into().unwrap());
+            let metadata = u64::from_le_bytes(header[16..24].try_into().unwrap());
+            if tensors == 0 || tensors > MAX_HEADER_ENTRIES || metadata > MAX_HEADER_ENTRIES {
+                return Err("The GGUF model header is invalid.".into());
+            }
+            let minimum = (HEADER_BYTES as u64)
+                .saturating_add(tensors.saturating_mul(24))
+                .saturating_add(metadata.saturating_mul(12));
+            if size < minimum {
+                return Err("The model file is incomplete or truncated.".into());
+            }
+        }
+    }
+    Ok(())
 }
 
 fn final_path(root: &Path, id: &str) -> Result<PathBuf, String> {
@@ -96,9 +157,25 @@ pub fn ready(root: &Path, id: &str) -> Result<PathBuf, String> {
     let path = final_path(root, id)?;
     let metadata =
         fs::symlink_metadata(&path).map_err(|_| "Download or import the selected model first.")?;
-    if !metadata.is_file() || catalog_entry(id).is_ok_and(|entry| metadata.len() != entry.bytes) {
-        return Err("The model file is invalid. Download or import it again.".into());
+    if !metadata.is_file() {
+        return Err(invalid_model("The model file is invalid."));
     }
+    let kind = kind_of(id)?;
+    if let Ok(entry) = catalog_entry(id) {
+        if metadata.len() != entry.bytes {
+            return Err(invalid_model("The model file is invalid."));
+        }
+    } else {
+        let (_, _, _, limit) = imported(kind);
+        if !(MIN_MODEL_BYTES..=limit).contains(&metadata.len()) {
+            return Err(invalid_model("The model file is invalid."));
+        }
+    }
+    let mut file = File::open(&path).map_err(|_| invalid_model("The model file is invalid."))?;
+    let mut header = [0; HEADER_BYTES];
+    file.read_exact(&mut header)
+        .map_err(|_| invalid_model("The model file is invalid."))?;
+    validate_header(kind, &header, metadata.len())?;
     Ok(path)
 }
 
@@ -125,28 +202,29 @@ pub fn remove(root: &Path, id: &str) -> Result<(), String> {
 }
 
 pub fn import(root: &Path, source: &Path, kind: Kind) -> Result<(), String> {
-    let (_, file, magic, limit) = imported(kind);
+    let (_, file, _, limit) = imported(kind);
     let metadata = fs::metadata(source).map_err(|_| "Could not open the model file.")?;
-    if !metadata.is_file() || !(1024..=limit).contains(&metadata.len()) {
+    if !metadata.is_file() || !(MIN_MODEL_BYTES..=limit).contains(&metadata.len()) {
         return Err("Model size is outside the supported range.".into());
     }
     let mut input = File::open(source).map_err(|_| "Could not open the model file.")?;
-    let mut header = [0; 4];
+    let mut header = [0; HEADER_BYTES];
     input
         .read_exact(&mut header)
         .map_err(|_| "Could not read the model header.")?;
-    if &header != magic {
-        return Err("The model has the wrong file format.".into());
-    }
+    validate_header(kind, &header, metadata.len())?;
     fs::create_dir_all(root).map_err(|_| "Could not create the model folder.")?;
     let mut destination =
         tempfile::NamedTempFile::new_in(root).map_err(|_| "Could not write the imported model.")?;
     destination
         .write_all(&header)
         .map_err(|_| "Could not write the imported model.")?;
-    let bytes = io::copy(&mut input.take(limit - 3), &mut destination)
-        .map_err(|_| "Could not copy the model.")?;
-    if bytes + 4 != metadata.len() {
+    let bytes = io::copy(
+        &mut input.take(limit - HEADER_BYTES as u64),
+        &mut destination,
+    )
+    .map_err(|_| "Could not copy the model.")?;
+    if bytes + HEADER_BYTES as u64 != metadata.len() {
         return Err("The imported file changed while copying.".into());
     }
     destination
@@ -334,5 +412,92 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         fs::write(root.path().join("ggml-tiny.part"), b"partial").unwrap();
         assert!(installed(root.path()).is_empty());
+    }
+
+    fn gguf_header(version: u32, tensors: u64, metadata: u64) -> Vec<u8> {
+        let mut header = b"GGUF".to_vec();
+        header.extend_from_slice(&version.to_le_bytes());
+        header.extend_from_slice(&tensors.to_le_bytes());
+        header.extend_from_slice(&metadata.to_le_bytes());
+        header
+    }
+
+    fn ggml_header(vocabulary: i32) -> Vec<u8> {
+        let mut header = b"lmgg".to_vec();
+        header.extend_from_slice(&vocabulary.to_le_bytes());
+        header
+    }
+
+    fn write_source(path: &Path, header: &[u8], size: usize) {
+        let mut bytes = vec![0_u8; size];
+        bytes[..header.len()].copy_from_slice(header);
+        fs::write(path, bytes).unwrap();
+    }
+
+    #[test]
+    fn imports_models_with_a_valid_structure() {
+        let directory = tempfile::tempdir().unwrap();
+        let root = directory.path().join("models");
+        let speech = directory.path().join("speech.bin");
+        write_source(&speech, &ggml_header(51_865), 4096);
+        import(&root, &speech, Kind::Speech).unwrap();
+        assert!(ready(&root, "imported-speech").is_ok());
+
+        let cleanup = directory.path().join("cleanup.gguf");
+        write_source(&cleanup, &gguf_header(3, 1, 1), 4096);
+        import(&root, &cleanup, Kind::Cleanup).unwrap();
+        assert!(ready(&root, "imported-cleanup").is_ok());
+        assert_eq!(
+            installed(&root),
+            vec!["imported-speech".to_owned(), "imported-cleanup".to_owned()]
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_or_truncated_import_headers() {
+        let directory = tempfile::tempdir().unwrap();
+        let root = directory.path().join("models");
+        let source = directory.path().join("source.gguf");
+
+        for (name, header) in [
+            ("version", gguf_header(99, 1, 1)),
+            ("tensor count", gguf_header(3, 0, 1)),
+            ("metadata count", gguf_header(3, 1, MAX_HEADER_ENTRIES + 1)),
+        ] {
+            write_source(&source, &header, 4096);
+            assert!(import(&root, &source, Kind::Cleanup).is_err(), "{name}");
+            assert!(!root.join("imported-cleanup.gguf").exists());
+        }
+
+        write_source(&source, &gguf_header(3, 1_000, 1_000), 4096);
+        assert!(import(&root, &source, Kind::Cleanup)
+            .unwrap_err()
+            .contains("truncated"));
+
+        write_source(&source, b"nope", 4096);
+        assert!(import(&root, &source, Kind::Cleanup).is_err());
+
+        write_source(&source, &gguf_header(3, 1, 1), 4096);
+        let error = import(&root, &source, Kind::Speech).unwrap_err();
+        assert!(error.contains("GGUF") && error.contains("GGML"));
+
+        write_source(&source, &ggml_header(51_865), 4096);
+        let error = import(&root, &source, Kind::Cleanup).unwrap_err();
+        assert!(error.contains("GGML") && error.contains("GGUF"));
+    }
+
+    #[test]
+    fn damaged_files_are_not_offered_as_installed() {
+        let root = tempfile::tempdir().unwrap();
+        fs::write(root.path().join("imported-cleanup.gguf"), vec![0_u8; 4096]).unwrap();
+        assert!(ready(root.path(), "imported-cleanup").is_err());
+        assert!(installed(root.path()).is_empty());
+
+        write_source(
+            &root.path().join("imported-whisper.bin"),
+            &ggml_header(51_865),
+            4096,
+        );
+        assert!(ready(root.path(), "imported-speech").is_ok());
     }
 }

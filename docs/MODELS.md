@@ -14,6 +14,15 @@ enthalten keine Modellgewichte. Die Lizenz eines Modells ist von der
 MIT-Lizenz des App-Codes getrennt. Prüfe bei importierten Dateien die Herkunft
 und die Lizenz des Originalmodells und der Konvertierung.
 
+## Importprüfung
+
+Beim Import reicht die Dateiendung nicht aus. Für Whisper prüft die App die
+GGML-Kennung und einen plausiblen Wortschatz. Für GGUF prüft sie Version,
+Anzahl der Tensoren und Metadaten sowie die Mindestgröße. Vertauschte Formate
+und unvollständige Dateien werden abgelehnt. Vor jeder Verwendung prüft die App
+die gespeicherte Datei erneut. Die Prüfung ersetzt keine vollständige
+Modellvalidierung durch die jeweilige Laufzeit.
+
 ## Modellkatalog
 
 | Modell | Downloadgröße | Format | Lizenz |

@@ -8,7 +8,7 @@ kein veröffentlichtes Installationspaket.
 ## Was vorhanden ist
 
 - Deutsch-englische Tauri-Oberfläche mit Übersicht, Kurzanleitung, Mikrofonwahl, konfigurierbarem Tastenkürzel, Halten und Umschalten, Aufnahmepegel, Abbruch, Statussymbol und Kopiermöglichkeit. Einstellungen bleiben nach Neustart erhalten. Die App speichert keinen Diktatverlauf.
-- Lokale Whisper-Erkennung auf der CPU. Der Katalog enthält die mehrsprachigen Modelle Tiny, Base, Small, Medium, Large-v3 und Large-v3 Turbo. Downloads verwenden feste Modellversionen, Größen und SHA-256-Prüfsummen. Es gibt Abbruch, Fortsetzen, Löschen und Import. Nur Whisper Base ist praktisch getestet.
+- Lokale Whisper-Erkennung auf der CPU. Der Katalog enthält die mehrsprachigen Modelle Tiny, Base, Small, Medium, Large-v3 und Large-v3 Turbo. Downloads verwenden feste Modellversionen, Größen und SHA-256-Prüfsummen. Es gibt Abbruch, Fortsetzen, Löschen und Import. Beim Import prüft die App Formatkennung, GGUF-Version und Grundstruktur; vertauschte Formate sowie beschädigte oder unvollständige Dateien werden abgelehnt. Nur Whisper Base ist praktisch getestet.
 - Lokale Textkorrektur mit mitgeliefertem llama.cpp-Programm und Qwen3-0.6B-Q8_0. Eigene dichte Qwen3-GGUF-Modelle können importiert werden. Anweisungen, Vorlagen, Wörterliste und Ziel für Übersetzung sind einstellbar. Bei Fehlern bleibt der Originaltext verfügbar.
 - Optionale Cloud-Korrektur mit OpenAI, Gemini, Anthropic, xAI, OpenRouter, Mistral, Groq, DeepSeek, Together AI, Fireworks, Cerebras und eigenen kompatiblen Servern. Die App sendet Text nur im aktivierten Cloud-Modus. Schlüssel werden im Passwortspeicher des Betriebssystems abgelegt.
 - Direkte Texteingabe unter Windows und X11 mit Prüfung des Zielfensters. Bei abweichendem Fokus oder gehaltenen Sondertasten bleibt der Text zum Kopieren in der App. Automatisches Tippen bleibt auf kurze einzeilige Texte beschränkt. macOS nutzt Kopieren. Wayland kann über die App aufnehmen und kopieren.
@@ -19,7 +19,7 @@ kein veröffentlichtes Installationspaket.
 | Prüfung | Ergebnis |
 | --- | --- |
 | Oberfläche | TypeScript, ESLint, 3 Vitest-Tests, Vite-Produktionsbuild und npm-Audit bestanden. npm meldet 0 Schwachstellen. |
-| Rust-App auf Linux x64 | Formatierung, Clippy und 19 Standardtests bestanden. Davon 11 für Anbieter mit nachgebildeten Antworten. Keine bezahlten oder echten Cloud-Aufrufe. |
+| Rust-App auf Linux x64 | Formatierung, Clippy und 22 Standardtests bestanden. Davon 11 für Anbieter mit nachgebildeten Antworten. Keine bezahlten oder echten Cloud-Aufrufe. |
 | Whisper Base | SHA-256 geprüft. Je eine künstliche deutsche und englische WAV-Datei wurde in einem Container ohne Netzwerk erkannt. Zusammen 2,08 s für beide Aufrufe inklusive Laden. |
 | Qwen3-0.6B-Q8_0 | SHA-256 geprüft. Formatierung, Clippy und 6 Standardtests bestanden. Je eine deutsche und englische Textkorrektur im Container ohne Netzwerk. Einzellauf ab Prozessstart inklusive Laden 0,714 s bzw. 0,698 s. |
 | Linux-DEB und Fensterwechsel | Debug-DEB gebaut und in Debian 12 ohne Systeminstallation entpackt. App startete unter X11 im virtuellen Bildschirm. In zwei netzlosen Durchläufen speiste PulseAudio künstliches deutsches Mikrofon-Audio ein. Halten führte zu einem deutschen Satz im externen GTK-Textfeld. Umschalten mit lokalem Qwen3 übersetzte den Text und fügte ihn auf Englisch ein. Die Tests prüfen den Ablauf und ein Stichwort. Beim Beispieldiktat gab es Erkennungsfehler. |
