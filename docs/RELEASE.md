@@ -1,5 +1,7 @@
 # Vorabversion veröffentlichen
 
+Aktiviere zuerst die [GitHub-Workflows](github-workflows/README.md).
+
 Die GitHub-Pipeline akzeptiert Tags (benannte Versionsstände) der Form
 `v0.1.0-alpha.1`, `v0.1.0-beta.1` oder `v0.1.0-rc.1`. Ein Tag muss auf einem
 Commit in `main` liegen. `package.json`, `src-tauri/Cargo.toml` und

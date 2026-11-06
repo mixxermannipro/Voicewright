@@ -72,3 +72,33 @@ Transkriptions- und Korrekturzeit sowie Zeit vom Aufnahmeende bis zum
 Ergebnis. Gib an, ob die Modelle bereits geladen waren. Verwende für
 Vergleiche dieselbe Aufnahme. Behandle Kompilierung, automatisierte Tests und
 diesen praktischen Durchlauf als getrennte Nachweise.
+
+## Automatischer Linux-X11-Durchlauf mit einem DEB
+
+`scripts/linux-smoke/run.sh` entpackt das DEB im Container. Es startet ein
+virtuelles X11-Fenster und speist PulseAudio mit künstlicher Mikrofoneingabe.
+Ein getrenntes GTK-Fenster prüft, ob tatsächlich Text ankommt. Gib optional
+das Qwen3-Modell als viertes Argument mit. Dann wird die Umschalttaste mit
+lokaler Übersetzung geprüft. Ohne dieses Modell prüft das Skript Halten
+mit Originaltext.
+
+Erzeuge aus `de.wav` aus dem Modelltest eine Rohdatei:
+
+```sh
+ffmpeg -i "$VOXTAKT_FIXTURES/de.wav" -ar 48000 -ac 2 -f s16le "$VOXTAKT_FIXTURES/de.raw"
+```
+
+Verwende einen unprivilegierten Linux-Container ohne Netzwerk. Er benötigt
+die Linux-Systembibliotheken aus [INSTALLATION.md](INSTALLATION.md) sowie
+`dpkg`, `xvfb`, `xdotool`, `dbus-x11`, `pulseaudio`,
+`pulseaudio-utils`, `libasound2-plugins` und `python3`. Rufe darin auf:
+
+```sh
+dbus-run-session -- bash scripts/linux-smoke/run.sh /pfad/VoxTakt.deb \
+  /pfad/ggml-base.bin /pfad/de.raw
+dbus-run-session -- bash scripts/linux-smoke/run.sh /pfad/VoxTakt.deb \
+  /pfad/ggml-base.bin /pfad/de.raw /pfad/Qwen3-0.6B-Q8_0.gguf
+```
+
+Das Skript verwendet im abgeschotteten Container eine WebKit-Option für
+verschachtelte Testumgebungen. Führe es nur im beschriebenen Container aus.

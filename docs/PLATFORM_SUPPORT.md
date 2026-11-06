@@ -12,7 +12,7 @@ veröffentlicht wurden, steht in [PROGRESS.md](PROGRESS.md) und auf
 | Linux x64 mit Wayland | Dieselben Linux-Pakete | Diktat über die App. Kopiere das Ergebnis manuell. Globale Kürzel und direkte Texteingabe sind in dieser Sitzung deaktiviert. |
 | macOS mit Intel | Kein Paket im aktuellen Ablauf | Eigenen Build und praktische Prüfung nachholen |
 
-Für die geplante direkte Texteingabe unter Windows und X11 prüft VoxTakt
+Für die direkte Texteingabe unter Windows und X11 prüft VoxTakt
 vor dem Tippen den Fokus. Bei Fokuswechsel, Steuerzeichen oder mehrzeiligem
 Text bleibt das Ergebnis zum Kopieren in der App. VoxTakt verwendet für die
 direkte Eingabe keinen automatischen Zugriff auf die Zwischenablage.
@@ -20,5 +20,5 @@ direkte Eingabe keinen automatischen Zugriff auf die Zwischenablage.
 Eine erfolgreiche Paketerstellung prüft keine Geräte und keine
 Berechtigungen. Für den manuellen Durchlauf siehe [TESTING.md](TESTING.md).
 Fenster mit erhöhten Rechten und geschützte Eingabefelder fallen außerhalb
-der vorgesehenen Unterstützung. Linux-Pakete werden auf Ubuntu 24.04
-gebaut. Ältere Distributionen können an neueren Systembibliotheken scheitern.
+der vorgesehenen Unterstützung. Der Veröffentlichungsablauf sieht Ubuntu 24.04 für den Linux-Paketbau vor.
+Der bisherige DEB-Test lief in Debian 12. Ältere Distributionen können an neueren Systembibliotheken scheitern.

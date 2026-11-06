@@ -49,6 +49,15 @@
     "resources": [
       "../LICENSE",
       "../docs/THIRD_PARTY_LICENSES.md"
-    ]
+    ],
+    "linux": {
+      "deb": {
+        "depends": [
+          "libasound2t64 | libasound2",
+          "libstdc++6",
+          "libgcc-s1"
+        ]
+      }
+    }
   }
 }

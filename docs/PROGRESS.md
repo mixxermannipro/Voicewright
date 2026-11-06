@@ -1,26 +1,46 @@
 # Arbeitsstand und Übergabe an Codex Cloud
 
-- Repository: `mixxermannipro/speechy`. Arbeitszweig: `feat/dictation-foundation`.
-- Zielversion: `0.1.0-alpha.1`. Main und eine Veröffentlichung sind getrennte Schritte.
-- Architektur und Datenfluss: [ARCHITECTURE.md](ARCHITECTURE.md).
+Arbeite im Repository `mixxermannipro/speechy` auf dem Zweig
+`feat/dictation-foundation` weiter. [Entwurf #1](https://github.com/mixxermannipro/speechy/pull/1)
+enthält den Projektstand für `0.1.0-alpha.1`. Für diese Version gibt es noch
+kein veröffentlichtes Installationspaket.
 
-## Vorhanden
+## Was vorhanden ist
 
-- Tauri-App mit Rust-Aufnahme, Aufnahmezuständen, Halten und Umschalten, Abbruch, Anzeige im Systembereich und manueller Kopiermöglichkeit. Automatisches Einfügen ist für X11 und Windows vorgesehen und an die Prüfung des Zielfokus gebunden. macOS verwendet vorerst Kopieren, Wayland startet über das App-Fenster.
-- Mehrsprachige Whisper-Modelle und Qwen3-Korrektur. Der Modellkatalog nutzt feste Quellen und Prüfsummen. Der separate llama.cpp-Prozess verarbeitet Text lokal.
-- Cloud-Anbieter OpenAI, Gemini, Anthropic, xAI, OpenRouter, Mistral, Groq, DeepSeek, Together AI, Fireworks und Cerebras sowie ein frei konfigurierbarer kompatibler Zugang. Schlüssel im Betriebssystem-Speicher. API-Tests verwenden nachgebildete Antworten.
-- Paket- und Prüfskripte für Ubuntu, Windows x64 und Apple Silicon. Windows und macOS wurden bisher nicht gebaut oder praktisch geprüft.
+- Deutsch-englische Tauri-Oberfläche mit Übersicht, Kurzanleitung, Mikrofonwahl, konfigurierbarem Tastenkürzel, Halten und Umschalten, Aufnahmepegel, Abbruch, Statussymbol und Kopiermöglichkeit. Einstellungen bleiben nach Neustart erhalten. Die App speichert keinen Diktatverlauf.
+- Lokale Whisper-Erkennung auf der CPU. Der Katalog enthält die mehrsprachigen Modelle Tiny, Base, Small, Medium, Large-v3 und Large-v3 Turbo. Downloads verwenden feste Modellversionen, Größen und SHA-256-Prüfsummen. Es gibt Abbruch, Fortsetzen, Löschen und Import. Nur Whisper Base ist praktisch getestet.
+- Lokale Textkorrektur mit mitgeliefertem llama.cpp-Programm und Qwen3-0.6B-Q8_0. Eigene dichte Qwen3-GGUF-Modelle können importiert werden. Anweisungen, Vorlagen, Wörterliste und Ziel für Übersetzung sind einstellbar. Bei Fehlern bleibt der Originaltext verfügbar.
+- Optionale Cloud-Korrektur mit OpenAI, Gemini, Anthropic, xAI, OpenRouter, Mistral, Groq, DeepSeek, Together AI, Fireworks, Cerebras und eigenen kompatiblen Servern. Die App sendet Text nur im aktivierten Cloud-Modus. Schlüssel werden im Passwortspeicher des Betriebssystems abgelegt.
+- Direkte Texteingabe unter Windows und X11 mit Prüfung des Zielfensters. Bei abweichendem Fokus oder gehaltenen Sondertasten bleibt der Text zum Kopieren in der App. Automatisches Tippen bleibt auf kurze einzeilige Texte beschränkt. macOS nutzt Kopieren. Wayland kann über die App aufnehmen und kopieren.
+- Vollständige [Vorlagen für die GitHub-Automatisierung](github-workflows/README.md). GitHub hat das Schreiben nach `.github/workflows/` abgelehnt, da der verwendeten Anmeldung die Berechtigung `workflow` fehlt. Die Dateien sind in diesem Zweig unter `docs/github-workflows/` gesichert. Mit passendem Zugriff verschieben und prüfen.
 
-## Belegt
+## Geprüft am 6. November 2026
 
-- Linux-Build der Rust-App mit 19 erfolgreichen Standardtests. Der zusätzliche echte Whisper-Test läuft separat.
-- Korrekturprogramm mit 6 erfolgreichen Standardtests, Formatprüfung und Clippy. Der zusätzliche echte Qwen3-Test bestand mit je einem deutschen und englischen Satz und abgeschaltetem Netzwerk. AMD Ryzen 7 7800X3D, gemessen 0,714 s bzw. 0,698 s ab Start des Korrekturprozesses inklusive Modellladen. Keine Ende-zu-Ende-Messung.
-- Die Bibliotheksprüfung für npm meldete eine moderate Schwachstelle in einem Entwicklungswerkzeug. Die fertige Oberfläche ist separat zu prüfen.
+| Prüfung | Ergebnis |
+| --- | --- |
+| Oberfläche | TypeScript, ESLint, 3 Vitest-Tests, Vite-Produktionsbuild und npm-Audit bestanden. npm meldet 0 Schwachstellen. |
+| Rust-App auf Linux x64 | Formatierung, Clippy und 19 Standardtests bestanden. Davon 11 für Anbieter mit nachgebildeten Antworten. Keine bezahlten oder echten Cloud-Aufrufe. |
+| Whisper Base | SHA-256 geprüft. Je eine künstliche deutsche und englische WAV-Datei wurde in einem Container ohne Netzwerk erkannt. Zusammen 2,08 s für beide Aufrufe inklusive Laden. |
+| Qwen3-0.6B-Q8_0 | SHA-256 geprüft. Formatierung, Clippy und 6 Standardtests bestanden. Je eine deutsche und englische Textkorrektur im Container ohne Netzwerk. Einzellauf ab Prozessstart inklusive Laden 0,714 s bzw. 0,698 s. |
+| Linux-DEB und Fensterwechsel | Debug-DEB gebaut und in Debian 12 ohne Systeminstallation entpackt. App startete unter X11 im virtuellen Bildschirm. In zwei netzlosen Durchläufen speiste PulseAudio künstliches deutsches Mikrofon-Audio ein. Halten führte zu einem deutschen Satz im externen GTK-Textfeld. Umschalten mit lokalem Qwen3 übersetzte den Text und fügte ihn auf Englisch ein. Die Tests prüfen den Ablauf und ein Stichwort. Beim Beispieldiktat gab es Erkennungsfehler. |
+| Start und Speicher | AMD Ryzen 7 7800X3D, 30 GiB System-RAM. Debug-Paket bis zum sichtbaren Fenster etwa 0,50 s. App-Hauptprozess im Leerlauf etwa 169 MiB RSS (belegter physischer Speicher), ohne getrennte WebKit-Prozesse. Keine Messung bis zur ersten nutzbaren Eingabe und keine vollständige Latenzmessung. |
+| RustSec | Beide Abhängigkeitslisten gescannt. Keine als Schwachstelle eingestuften Treffer. App-Liste mit 8 Warnungen zu nicht gepflegten Bibliotheken und einer unsicheren GLib-Schnittstelle in dieser Warnungszahl. Engine-Liste ohne Warnung. Warnungen vor Freigabe bewerten. |
 
-## Weiterarbeit
+Der virtuelle Linux-Test verwendet künstliche Eingabe und kein physisches
+Mikrofon. Windows, macOS und Linux Wayland wurden praktisch noch nicht
+geprüft. NSIS, DMG und AppImage sind noch nicht gebaut. Die aktuelle
+x64-Build-Konfiguration der lokalen Korrektur verwendet AVX2 und verwandte
+Prozessorfunktionen. Ein Starttest auf älteren Prozessoren fehlt.
 
-1. Oberfläche und native Befehle zusammen prüfen. `npm ci`, `npm run check`, `npm run lint`, `npm test`, `npm run build`, `npm run prepare:engine`, dann Rust-Befehle aus [TESTING.md](TESTING.md). Beide Cargo-Lockdateien erhalten.
-2. Offline mit echtem Whisper-Base-Modell, Sprachdateien und Qwen3 prüfen. Danach auf den echten Zielsystemen Mikrofon, Halten/Umschalten, Fokuswechsel, Texte mit Umlauten, Systembereich, Berechtigungen und Installationsstart praktisch prüfen. Die lokale Fedora-Sitzung ist Wayland. X11 kann in einem virtuellen Bildschirm separat getestet werden.
-3. Fehlende Funktionen ergänzen: macOS-Zugriffshilfe für Einfügen, Wayland-Tastenkürzel über das Desktop-Portal, sicheres Einfügen mehrzeiliger Texte, Parakeet V3 mit geprüftem ONNX-Modell, bessere Spracherkennung bei Stille, GPU-Erkennung und Hardware-Beschleunigung mit CPU-Rückfall, Systemstart und Audiosignale, optionale Diagnose. Eigene Modelle brauchen stärkere Kompatibilitätsprüfung vor der Auswahl.
-4. Paketierung und Sicherheit prüfen. Prüfe Lizenzhinweise der mitgelieferten Bibliotheken, RustSec, gemessenen Start und Speicherbedarf, die Windows- und macOS-Builds und die drei Paketarten. Echtes Anbieter-Login und die Passwortspeicher wurden noch nicht praktisch geprüft.
-5. Erst mit bestätigter Prüfkette den Arbeitszweig zusammenführen. Danach das dokumentierte Tag für eine Vorabversion erstellen. Signierung, macOS-Notarisierung und authentifizierte Updates sind noch offen.
+## Nächste Schritte
+
+1. **Prüfungen auf GitHub aktivieren.** Folge [github-workflows/README.md](github-workflows/README.md). Prüfe den Änderungsvorschlag auf Ubuntu und baue NSIS, DMG und AppImage. Prüfe, ob jedes Paket das Korrekturprogramm und alle nötigen Systembibliotheken enthält. Das lokale DEB ist ein Debug-Testpaket. Die Erstfreigabe braucht einen optimierten Paketbau.
+2. **Echte Desktop-Tests nachholen.** Prüfe physisches Mikrofon, Gerätewechsel und Trennung, Tastenkürzel und Abbruch während jeder Phase, Fokuswechsel, Sonderzeichen, Kopieren, Statussymbol bei geschlossenem Fenster und Installationsstart. Prüfe Passwortspeicher und Anbieter freiwillig mit eigenen Testschlüsseln. Wiederhole den automatisierten [Linux-Test](TESTING.md) mit dem endgültigen Paket.
+3. **Einfügen und Wayland ergänzen.** Baue die macOS-Zugriffshilfe zur Prüfung des fokussierten Elements und zur Texteingabe. Prüfe das Desktop-Portal für Wayland-Tastenkürzel. Unterstütze mehrzeiligen Text nur mit sicherer, bestätigter Einfügung und Erhalt von Bild- und Textdaten in der Zwischenablage. Die aktuelle X11-Prüfung kennt das Fenster. Sie kann Wechsel zwischen Feldern derselben App nicht zuverlässig erkennen.
+4. **Modelle und Leistung vervollständigen.** Prüfe echte Downloads inklusive Unterbrechung, Bereichsantwort, Prüfsummenfehler und freien Speicher. Ergänze bessere Stille-Erkennung, robustere Modellimport-Prüfung, Parakeet V3 mit geprüftem sherpa-onnx-Modell, GPU-Erkennung und Beschleunigung mit CPU-Rückfall. Teste portable x64-Builds auf älteren CPUs. Dokumentiere Ende-zu-Ende-Zeiten, Spitzen-RAM und GPU-Verhalten auf echter Hardware.
+5. **Restliche Bedienung und Veröffentlichung.** Ergänze Systemstart, optionale Audiosignale und Diagnose. Manche System- und Anbieterfehler sind nur einsprachig. Prüfe die Lizenzhinweise der tatsächlich ausgelieferten Bibliotheken und RustSec-Warnungen. Führe den Arbeitszweig mit `main` zusammen, wenn die Prüfungen passen. Folge dann [RELEASE.md](RELEASE.md). Signierung, macOS-Notarisierung und authentifizierte Updates sind offen.
+
+Für den Einstieg in den Quellcode siehe [ARCHITECTURE.md](ARCHITECTURE.md).
+Die Befehle stehen in [INSTALLATION.md](INSTALLATION.md) und
+[TESTING.md](TESTING.md). Die beiden Cargo-Lockdateien und
+`package-lock.json` gehören zum Stand.
