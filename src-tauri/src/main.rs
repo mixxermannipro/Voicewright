@@ -9,6 +9,7 @@ mod models;
 mod providers;
 mod session;
 mod settings;
+mod settings_portable;
 mod speech;
 
 fn main() {
