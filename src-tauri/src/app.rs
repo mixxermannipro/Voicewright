@@ -1,6 +1,6 @@
 use crate::{
     audio::{self, Capture},
-    cleanup, guard, insertion, models, providers,
+    cleanup, guard, insertion, models, providers, settings_portable,
     session::{apply_shortcut_changes, Action, HotkeyState, Phase, ShortcutKind, Status},
     settings::{self, CleanupMode, RecordingMode, Settings},
     speech,
@@ -249,6 +249,65 @@ async fn preview_cleanup(
         }
     };
     guard::validate(&transcript, edited)
+}
+
+#[tauri::command]
+fn default_settings() -> Settings {
+    // Does not touch API keys, installed models, or the current on-disk config.
+    Settings::default()
+}
+
+#[tauri::command]
+async fn export_settings(app: AppHandle) -> Result<bool, String> {
+    let current = {
+        let state = app.state::<AppState>();
+        let inner = state.inner.lock().unwrap();
+        if inner.status.phase.busy() {
+            return Err("Finish the current dictation before exporting settings.".into());
+        }
+        inner.settings.clone()
+    };
+    blocking(move || {
+        let chosen = app.dialog().file()
+            .add_filter("JSON", &["json"])
+            .blocking_save_file();
+        let Some(file) = chosen else {
+            return Ok(false);
+        };
+        let path = file.into_path()
+            .map_err(|_| "Choose a local export destination.".to_owned())?;
+        settings_portable::export(&path, &current)?;
+        Ok(true)
+    }).await
+}
+
+#[tauri::command]
+async fn import_settings_preview(app: AppHandle) -> Result<Option<Settings>, String> {
+    {
+        let state = app.state::<AppState>();
+        let inner = state.inner.lock().unwrap();
+        if inner.status.phase.busy() || inner.transfer.is_some() {
+            return Err("Finish dictation and model operations before importing settings.".into());
+        }
+    }
+    blocking(move || {
+        let chosen = app.dialog().file()
+            .add_filter("JSON", &["json"])
+            .blocking_pick_file();
+        let Some(file) = chosen else {
+            return Ok(None);
+        };
+        let path = file.into_path()
+            .map_err(|_| "Choose a local settings file.".to_owned())?;
+        let metadata = fs::symlink_metadata(&path)
+            .map_err(|_| "Could not inspect the settings import.".to_owned())?;
+        if !metadata.is_file() || metadata.len() > 256 * 1024 {
+            return Err("The import must be a regular JSON file under 256 KiB.".into());
+        }
+        let bytes = fs::read(&path)
+            .map_err(|_| "Could not read the selected settings export.".to_owned())?;
+        Ok(Some(settings_portable::import(&bytes)?))
+    }).await
 }
 
 fn start_session(app: &AppHandle, from_hotkey: bool) -> Result<(), String> {
@@ -860,6 +919,9 @@ pub fn run() {
             status,
             microphones,
             save_settings,
+            default_settings,
+            export_settings,
+            import_settings_preview,
             preview_cleanup,
             start_test,
             stop,
