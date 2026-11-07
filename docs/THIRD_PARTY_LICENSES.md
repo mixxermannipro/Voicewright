@@ -1,6 +1,6 @@
 # Fremdsoftware und Modelle
 
-Die MIT-Lizenz in [LICENSE](../LICENSE) gilt für den VoxTakt-Code. Für
+Die MIT-Lizenz in [LICENSE](../LICENSE) gilt für den Voicewright-Code. Für
 Fremdsoftware gelten jeweils die Lizenztexte und Hinweise der Urheber.
 
 | Projekt | Rolle | Lizenz laut Projekt |

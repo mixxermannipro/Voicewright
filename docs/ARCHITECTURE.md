@@ -1,6 +1,6 @@
 # Architektur
 
-VoxTakt ist eine eigenständige Anwendung im bereitgestellten Repository `mixxermannipro/speechy`. Der Produktname unterscheidet sie von vorhandenen Diktierprodukten namens Speechy. Die Vorprüfung umfasste öffentliche Web- und GitHub-Suchen und ersetzt keine Markenprüfung.
+Voicewright ist eine eigenständige Anwendung im Repository `mixxermannipro/Voicewright`. Der Produktname wurde mit dem Repository-Namen vereinheitlicht. Eine belastbare Marken- und Namensprüfung steht noch aus und gehört zu Issue #28.
 
 ## Technische Entscheidungen
 
@@ -13,7 +13,7 @@ VoxTakt ist eine eigenständige Anwendung im bereitgestellten Repository `mixxer
 
 ## Vergleich vor der Umsetzung
 
-| Projekt | Entscheidung für VoxTakt |
+| Projekt | Entscheidung für Voicewright |
 | --- | --- |
 | [Handy](https://github.com/cjpais/Handy) | Bestätigt Tauri und eine lokale, vom Fenster getrennte Aufnahme als geeigneten Aufbau. Eigene Implementierung für Hotkeys, Modellstatus und Zielprüfung. |
 | [OpenWhispr](https://github.com/OpenWhispr/openwhispr) | Zeigt die Kombination aus lokaler Erkennung, Parakeet und optionalen Cloud-Anbietern. Wir verwenden Tauri statt Electron und trennen Anbieterprotokolle von der lokalen Erkennung. |

@@ -1,6 +1,6 @@
-# VoxTakt
+# Voicewright
 
-VoxTakt ist eine freie Desktop-App für lokale Diktate auf Deutsch, Englisch
+Voicewright ist eine freie Desktop-App für lokale Diktate auf Deutsch, Englisch
 und in weiteren Whisper-Sprachen. Mikrofon und Spracherkennung arbeiten auf
 dem eigenen Gerät. Eine optionale Textkorrektur kann ebenfalls lokal laufen.
 Cloud-Dienste sind freiwillig und nur mit eigener Konfiguration aktiv.

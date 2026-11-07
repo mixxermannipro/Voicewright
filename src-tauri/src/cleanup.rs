@@ -35,7 +35,10 @@ pub async fn local(
 ) -> Result<String, String> {
     let binary = std::env::current_exe()
         .map_err(|_| "Could not locate the cleanup engine.")?
-        .with_file_name(format!("voxtakt-cleanup{}", std::env::consts::EXE_SUFFIX));
+        .with_file_name(format!(
+            "voicewright-cleanup{}",
+            std::env::consts::EXE_SUFFIX
+        ));
     let request = serde_json::to_vec(&Request {
         model,
         system,

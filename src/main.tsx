@@ -100,7 +100,7 @@ function App() {
     catch (cause) { setError(String(cause)); }
   };
 
-  if (!initial || !draft || !saved) return <main className="loading"><h1>VoxTakt</h1><p role="status">{error || 'Wird geladen …'}</p></main>;
+  if (!initial || !draft || !saved) return <main className="loading"><h1>Voicewright</h1><p role="status">{error || 'Wird geladen …'}</p></main>;
 
   const update = <K extends keyof Settings>(field: K, value: Settings[K]) => {
     setDraft((current) => current ? { ...current, [field]: value } : current);
@@ -150,7 +150,7 @@ function App() {
   return <div className="shell">
     <a className="skip" href="#content">{t('Zum Inhalt', 'Skip to content')}</a>
     <aside className="sidebar">
-      <div className="brand"><span className="mark" aria-hidden="true">╎╏┃╏╎</span><span>VoxTakt<small>DESKTOP · ALPHA</small></span></div>
+      <div className="brand"><span className="mark" aria-hidden="true">╎╏┃╏╎</span><span>Voicewright<small>DESKTOP · ALPHA</small></span></div>
       <nav aria-label={t('Bereiche', 'Sections')}>{pages.map((entry, index) => <button key={entry} type="button"
         aria-current={page === entry ? 'page' : undefined} onClick={() => moveTo(entry)}>
         <span className="nav-index" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>{labels[entry]}
@@ -196,7 +196,7 @@ function App() {
             {busy && <button onClick={() => void run('cancel')}>{t('Abbrechen', 'Cancel')}</button>}
           </div>
           <p className="muted small">{showTray
-            ? t('Beim Schließen bleibt VoxTakt im Statusbereich. Ein Testdiktat bleibt in diesem Fenster.', 'Closing the window keeps VoxTakt in the tray. Test dictation stays in this window.')
+            ? t('Beim Schließen bleibt Voicewright im Statusbereich. Ein Testdiktat bleibt in diesem Fenster.', 'Closing the window keeps Voicewright in the tray. Test dictation stays in this window.')
             : t('Das Statussymbol ist hier nicht verfügbar.', 'The tray icon is unavailable here.')}</p>
         </Section>
         {status?.warning && <p className="message" role="status">{status.warning}</p>}
@@ -287,12 +287,12 @@ function App() {
       </>}
       {page === 'privacy' && <>
         <Section title={t('Was auf dem Gerät bleibt', 'What stays on your device')}>
-          <p>{t('Die Mikrofonaufnahme bleibt im Arbeitsspeicher. VoxTakt speichert keinen Diktatverlauf und sendet keine Nutzungsdaten. Modelldownloads laufen direkt über Hugging Face.', 'Microphone audio stays in memory. VoxTakt keeps no dictation history and sends no usage data. Model downloads come directly from Hugging Face.')}</p>
+          <p>{t('Die Mikrofonaufnahme bleibt im Arbeitsspeicher. Voicewright speichert keinen Diktatverlauf und sendet keine Nutzungsdaten. Modelldownloads laufen direkt über Hugging Face.', 'Microphone audio stays in memory. Voicewright keeps no dictation history and sends no usage data. Model downloads come directly from Hugging Face.')}</p>
           <p>{t('Nur bei eingeschalteter Cloud-Korrektur gehen der erkannte Text, die Bearbeitungsanweisung und gegebenenfalls Wörterliste oder Übersetzungsziel an deinen Anbieter.', 'Only when cloud editing is enabled do the recognized text, editing instructions and any vocabulary or translation target go to your provider.')}</p>
           <button disabled={busy || !status?.transcript} onClick={() => void run('clear_result')}>{t('Letztes Ergebnis leeren', 'Clear latest result')}</button>
         </Section>
         <Section title={t('Gerät und Version', 'Device and version')}>
-          <p>VoxTakt 0.1.0-alpha.1</p>
+          <p>Voicewright 0.1.0-alpha.1</p>
           <p>{initial.hardware.cpu} · {initial.hardware.threads} {t('logische Kerne', 'logical cores')} · {(initial.hardware.ram / 2 ** 30).toFixed(1)} GiB RAM</p>
           <p className="muted">{t('Die Modelle laufen in dieser Version auf dem Prozessor. Automatische Updates sind aus.', 'Models run on the CPU in this version. Automatic updates are disabled.')}</p>
         </Section>

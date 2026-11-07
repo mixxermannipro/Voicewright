@@ -3,6 +3,6 @@
 <plist version="1.0">
 <dict>
   <key>NSMicrophoneUsageDescription</key>
-  <string>VoxTakt verwendet dein Mikrofon, um Diktate auf diesem Gerät zu erkennen. VoxTakt uses your microphone to transcribe dictation on this device.</string>
+  <string>Voicewright verwendet dein Mikrofon, um Diktate auf diesem Gerät zu erkennen. Voicewright uses your microphone to transcribe dictation on this device.</string>
 </dict>
 </plist>

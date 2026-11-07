@@ -1,9 +1,16 @@
-# Arbeitsstand und Übergabe an Codex Cloud
+# Arbeitsstand und Übergabe
 
-Arbeite im Repository `mixxermannipro/speechy` auf dem Zweig
-`feat/dictation-foundation` weiter. [Entwurf #1](https://github.com/mixxermannipro/speechy/pull/1)
-enthält den Projektstand für `0.1.0-alpha.1`. Für diese Version gibt es noch
-kein veröffentlichtes Installationspaket.
+Der Alpha-Stand aus [PR #1](https://github.com/mixxermannipro/Voicewright/pull/1)
+wurde am 7. November 2026 nach `main` integriert. Der Zweig
+`feat/dictation-foundation` ist damit abgeschlossen. Die nächsten Aufgaben
+laufen über eigene Zweige und Pull Requests gegen `main`.
+
+Produktname und Repository heißen jetzt **Voicewright**. Die Anwendung
+übernimmt vorhandene Einstellungen und Modelle aus dem alten Datenordner
+`de.voxtakt.desktop` beim ersten Start. Bereits gespeicherte API-Schlüssel
+werden weiterhin gelesen; beim nächsten Speichern werden sie unter dem neuen
+Dienstnamen abgelegt. Für diese Version gibt es noch kein veröffentlichtes
+Installationspaket.
 
 ## Was vorhanden ist
 
@@ -12,13 +19,16 @@ kein veröffentlichtes Installationspaket.
 - Lokale Textkorrektur mit mitgeliefertem llama.cpp-Programm und Qwen3-0.6B-Q8_0. Eigene dichte Qwen3-GGUF-Modelle können importiert werden. Anweisungen, Vorlagen, Wörterliste und Ziel für Übersetzung sind einstellbar. Bei Fehlern bleibt der Originaltext verfügbar.
 - Optionale Cloud-Korrektur mit OpenAI, Gemini, Anthropic, xAI, OpenRouter, Mistral, Groq, DeepSeek, Together AI, Fireworks, Cerebras und eigenen kompatiblen Servern. Die App sendet Text nur im aktivierten Cloud-Modus. Schlüssel werden im Passwortspeicher des Betriebssystems abgelegt.
 - Direkte Texteingabe unter Windows und X11 mit Prüfung des Zielfensters. Bei abweichendem Fokus oder gehaltenen Sondertasten bleibt der Text zum Kopieren in der App. Automatisches Tippen bleibt auf kurze einzeilige Texte beschränkt. macOS nutzt Kopieren. Wayland kann über die App aufnehmen und kopieren.
-- Vollständige [Vorlagen für die GitHub-Automatisierung](github-workflows/README.md). GitHub hat das Schreiben nach `.github/workflows/` abgelehnt, da der verwendeten Anmeldung die Berechtigung `workflow` fehlt. Die Dateien sind in diesem Zweig unter `docs/github-workflows/` gesichert. Mit passendem Zugriff verschieben und prüfen.
+- Vollständige [Vorlagen für die GitHub-Automatisierung](github-workflows/README.md). GitHub hat das Schreiben nach `.github/workflows/` abgelehnt, da der verwendeten Anmeldung die Berechtigung `workflow` fehlt. Die Dateien bleiben unter `docs/github-workflows/` gesichert, bis ein Token mit dieser Berechtigung verfügbar ist.
 
 ## Geprüft am 6. November 2026
 
 | Prüfung | Ergebnis |
 | --- | --- |
-| Oberfläche | TypeScript, ESLint, 3 Vitest-Tests, Vite-Produktionsbuild und npm-Audit bestanden. npm meldet 0 Schwachstellen. |
+| Oberfläche am 7. November 2026 | TypeScript, ESLint, 3 Vitest-Tests und Vite-Produktionsbuild nach dem Branding-Wechsel bestanden. |
+| Rust-App am 7. November 2026 | Formatierung, Clippy mit `-D warnings` und 22 Standardtests im Podman-Build-Image bestanden. |
+| Korrekturprozess am 7. November 2026 | Formatierung, Clippy mit `-D warnings`, 3 Standardtests und 3 Protokolltests bestanden; der Modelltest bleibt ohne Gewichte übersprungen. |
+| Oberfläche am 6. November 2026 | TypeScript, ESLint, 3 Vitest-Tests, Vite-Produktionsbuild und npm-Audit bestanden. npm meldet 0 Schwachstellen. |
 | Rust-App auf Linux x64 | Formatierung, Clippy und 22 Standardtests bestanden. Davon 11 für Anbieter mit nachgebildeten Antworten. Keine bezahlten oder echten Cloud-Aufrufe. |
 | Whisper Base | SHA-256 geprüft. Je eine künstliche deutsche und englische WAV-Datei wurde in einem Container ohne Netzwerk erkannt. Zusammen 2,08 s für beide Aufrufe inklusive Laden. |
 | Qwen3-0.6B-Q8_0 | SHA-256 geprüft. Formatierung, Clippy und 6 Standardtests bestanden. Je eine deutsche und englische Textkorrektur im Container ohne Netzwerk. Einzellauf ab Prozessstart inklusive Laden 0,714 s bzw. 0,698 s. |

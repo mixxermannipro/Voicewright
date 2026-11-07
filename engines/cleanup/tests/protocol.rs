@@ -7,7 +7,7 @@ use std::{
 use serde_json::{json, Value};
 
 fn run(request: &[u8]) -> Value {
-    let mut child = Command::new(env!("CARGO_BIN_EXE_voxtakt-cleanup"))
+    let mut child = Command::new(env!("CARGO_BIN_EXE_voicewright-cleanup"))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -42,9 +42,9 @@ fn rejects_relative_paths() {
 }
 
 #[test]
-#[ignore = "requires the pinned Qwen3-0.6B-Q8_0.gguf via VOXTAKT_TEST_GGUF"]
+#[ignore = "requires the pinned Qwen3-0.6B-Q8_0.gguf via VOICEWRIGHT_TEST_GGUF"]
 fn cleans_english_and_german_with_local_weights() {
-    let model = std::env::var_os("VOXTAKT_TEST_GGUF").expect("provide absolute model path");
+    let model = std::env::var_os("VOICEWRIGHT_TEST_GGUF").expect("provide absolute model path");
     for (transcript, expected) in [
         (
             "um Berlin is the capital of Germany",

@@ -1,7 +1,7 @@
 # Installation
 
 Falls eine Vorabversion verfügbar ist, findest du ihre Dateien in
-[GitHub Releases](https://github.com/mixxermannipro/speechy/releases).
+[GitHub Releases](https://github.com/mixxermannipro/Voicewright/releases).
 Die [Plattformübersicht](PLATFORM_SUPPORT.md) zeigt, welche Pakete der
 Veröffentlichungsablauf erzeugt und welche Prüfungen erforderlich sind.
 

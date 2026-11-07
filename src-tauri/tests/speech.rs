@@ -7,8 +7,8 @@ use std::{env, path::Path, sync::atomic::AtomicBool};
 #[ignore = "requires verified local model and generated fixtures; see docs/TESTING.md"]
 fn recognizes_german_and_english_locally() {
     whisper_rs::install_logging_hooks();
-    let model = env::var("VOXTAKT_WHISPER_MODEL").unwrap();
-    let fixtures = env::var("VOXTAKT_FIXTURES").unwrap();
+    let model = env::var("VOICEWRIGHT_WHISPER_MODEL").unwrap();
+    let fixtures = env::var("VOICEWRIGHT_FIXTURES").unwrap();
     for (language, expected) in [("de", "morgen"), ("en", "morning")] {
         let path = Path::new(&fixtures).join(format!("{language}.wav"));
         let mut reader = hound::WavReader::open(path).unwrap();

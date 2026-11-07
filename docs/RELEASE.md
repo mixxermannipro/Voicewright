@@ -16,7 +16,7 @@ der Versionsnummer.
    ```sh
    git switch main
    git pull --ff-only
-   git tag -a v0.1.0-alpha.1 -m 'VoxTakt 0.1.0-alpha.1'
+   git tag -a v0.1.0-alpha.1 -m 'Voicewright 0.1.0-alpha.1'
    git push origin v0.1.0-alpha.1
    ```
 

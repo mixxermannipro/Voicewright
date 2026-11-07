@@ -1,6 +1,6 @@
-# VoxTakt
+# Voicewright
 
-VoxTakt ist eine Desktop-App für lokales Diktat. Die Oberfläche verwendet
+Voicewright ist eine Desktop-App für lokales Diktat. Die Oberfläche verwendet
 Tauri 2, React und TypeScript. Rust steuert Aufnahme und Verarbeitung.
 
 ## Struktur
@@ -16,6 +16,12 @@ Tauri 2, React und TypeScript. Rust steuert Aufnahme und Verarbeitung.
 - Oberfläche: `npm run check`, `npm run lint`, `npm test`, `npm run build`.
 - Rust: `cargo fmt`, `cargo clippy --locked` und `cargo test --locked` in
   beiden Rust-Projekten. Vorher den Korrekturprozess bauen.
+- Wenn auf dem Rechner kein Rust-Toolchain mit Systembibliotheken vorhanden
+  ist, lassen sich die Rust-Prüfungen im vorhandenen Podman-Image ausführen:
+  `podman run --rm -v "$PWD":/work:Z -w /work localhost/voxtakt-build:latest`.
+  Im Container `PATH=/usr/local/cargo/bin:$PATH` setzen. Für das
+  Korrekturprojekt `CARGO_TARGET_DIR=/work/target` verwenden, damit der
+  Testpfad zum eingebetteten Programm passt.
 
 ## Regeln
 
