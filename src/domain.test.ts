@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatDuration, shortcutFromKey } from './domain';
+import { canAdvanceSetup, formatDuration, shortcutFromKey } from './domain';
 
 describe('shortcut capture', () => {
   const base = { altKey: false, ctrlKey: false, shiftKey: false, metaKey: false, repeat: false };
@@ -18,4 +18,25 @@ describe('shortcut capture', () => {
 it('formats a recording clock without negative durations', () => {
   expect(formatDuration(65_200)).toBe('01:05');
   expect(formatDuration(-500)).toBe('00:00');
+});
+
+
+describe('first-run progress gates', () => {
+  it('does not require a cloud account or network access for the privacy step', () => {
+    expect(canAdvanceSetup(0, false, undefined)).toBe(true);
+  });
+  it('waits for a ready model and a completed non-empty microphone dictation', () => {
+    expect(canAdvanceSetup(1, false, undefined)).toBe(false);
+    expect(canAdvanceSetup(1, true, undefined)).toBe(true);
+    expect(canAdvanceSetup(2, true, { phase: 'recording', transcript: 'test' })).toBe(false);
+    expect(canAdvanceSetup(2, true, { phase: 'failed', transcript: 'test' })).toBe(false);
+    expect(canAdvanceSetup(2, true, { phase: 'completed', transcript: ' ' })).toBe(false);
+    expect(canAdvanceSetup(2, true, { phase: 'completed', transcript: 'Hallo Welt' })).toBe(true);
+    expect(canAdvanceSetup(2, true, { phase: 'completed', transcript: 'Hallo Welt' }, false, true)).toBe(false);
+  });
+  it('never claims an external shortcut test without explicit acknowledgement', () => {
+    expect(canAdvanceSetup(3, true, undefined, false)).toBe(false);
+    expect(canAdvanceSetup(3, true, undefined, true)).toBe(true);
+    expect(canAdvanceSetup(99, true, undefined, true)).toBe(false);
+  });
 });

@@ -92,3 +92,32 @@ details code { display: block; }
   .facts, .columns { grid-template-columns: 1fr; }
   .onboarding { align-items: flex-start; flex-direction: column; }
 }
+
+
+/* Compact, accessible first-run navigation; no motion or external assets. */
+.first-run-guide { border-color: #a8cbbd; }
+.first-run-guide > h3 { margin-top: 16px; }
+.setup-steps {
+  list-style: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px; margin: 16px 0; padding: 0;
+}
+.setup-steps li {
+  display: flex; align-items: center; gap: 7px; padding: 8px;
+  border: 1px solid var(--line); border-radius: 8px; color: var(--muted);
+  font-size: .83rem; overflow-wrap: anywhere;
+}
+.setup-steps li span {
+  display: inline-grid; place-items: center; flex: 0 0 24px;
+  border-radius: 50%; border: 1px solid currentColor; width: 24px; height: 24px;
+}
+.setup-steps li.active {
+  background: #e3f0e9; border-color: #7eae99; color: var(--ink); font-weight: 700;
+}
+.setup-steps li.done { color: var(--brand); }
+.setup-navigation { margin-top: 18px; }
+@media (max-width: 600px) {
+  .setup-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (prefers-contrast: more) {
+  .setup-steps li.active { border-width: 2px; }
+}

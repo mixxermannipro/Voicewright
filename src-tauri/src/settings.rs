@@ -61,6 +61,9 @@ pub struct Settings {
     pub cancel_shortcut: String,
     pub recording_mode: RecordingMode,
     pub microphone: Option<String>,
+    /// First-run progress: privacy, model, microphone, and external text test.
+    pub onboarding_step: u8,
+    pub onboarding_complete: bool,
 }
 
 impl Default for Settings {
@@ -85,6 +88,8 @@ impl Default for Settings {
             cancel_shortcut: String::new(),
             recording_mode: RecordingMode::Hold,
             microphone: None,
+            onboarding_step: 0,
+            onboarding_complete: false,
         }
     }
 }
@@ -93,6 +98,9 @@ impl Settings {
     pub fn validate(&self) -> Result<(), String> {
         if self.schema_version != SETTINGS_SCHEMA_VERSION {
             return Err("Unsupported settings schema version.".into());
+        }
+        if self.onboarding_step > 3 {
+            return Err("Invalid onboarding step.".into());
         }
         if !matches!(self.locale.as_str(), "de" | "en")
             || self.speech_language.len() > 16
@@ -286,6 +294,25 @@ mod tests {
         let serialized = serde_json::to_string(&enabled).unwrap();
         let restored: Settings = serde_json::from_str(&serialized).unwrap();
         assert!(restored.spoken_formatting);
+    }
+
+    #[test]
+    fn onboarding_is_opt_in_to_completion_and_migrates_old_settings() {
+        let fresh = Settings::default();
+        assert!(!fresh.onboarding_complete);
+        assert_eq!(fresh.onboarding_step, 0);
+        let old: Settings =
+            serde_json::from_str(r#"{"schema_version":3,"shortcut":"Ctrl+Shift+Space"}"#).unwrap();
+        assert!(!old.onboarding_complete);
+        assert_eq!(old.onboarding_step, 0);
+        let mut saved = Settings::default();
+        saved.onboarding_step = 2;
+        saved.onboarding_complete = true;
+        let roundtrip: Settings = serde_json::from_str(&serde_json::to_string(&saved).unwrap()).unwrap();
+        assert_eq!(roundtrip.onboarding_step, 2);
+        assert!(roundtrip.onboarding_complete);
+        saved.onboarding_step = 4;
+        assert!(saved.validate().is_err());
     }
 
     #[test]
