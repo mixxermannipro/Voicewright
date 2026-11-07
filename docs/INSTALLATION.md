@@ -22,6 +22,17 @@ bleibt die Funktion aus, und bei Aktivierung werden ausschließlich
 Textzeichen umgewandelt, keine Betriebssystembefehle ausgeführt.
 Liste, Beispiele und Grenzen: [Gesprochene Textformatierung](SPOKEN_FORMATTING.md).
 
+## Erste zwei Minuten in der App
+
+Auf der **Übersicht** führt die Ersteinrichtung in vier Schritten
+durch Datenschutz, ausdrücklich angeforderten Modelldownload,
+Mikrofontest und die Prüfung des Tastenkürzels bzw. Kopier-Fallbacks.
+Kein Cloud-Konto und keine API-Schlüssel sind dafür erforderlich.
+Der Assistent speichert den Fortschritt nach jedem Schritt.
+Eine Wiederholung ist jederzeit unter **Einstellungen** möglich.
+Die ausführliche Anleitung einschließlich Windows-/macOS-/Linux-Rechten
+steht in [ONBOARDING.md](ONBOARDING.md).
+
 ## Für Nutzer
 
 1. Wähle ein Paket für dein Betriebssystem und deine Prozessorart. Vergleiche
