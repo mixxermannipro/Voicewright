@@ -12,6 +12,17 @@ werden weiterhin gelesen; beim nächsten Speichern werden sie unter dem neuen
 Dienstnamen abgelegt. Für diese Version gibt es noch kein veröffentlichtes
 Installationspaket.
 
+## Sicherheitsreview (Issue #27)
+
+Das [Bedrohungsmodell](THREAT_MODEL.md) dokumentiert die Vertrauensgrenzen
+zwischen Mikrofon, nativem ASR/LLM-Prozess, optionalem Cloud-Anbieter,
+Modellserver, Tauri-Webview, OS-Zwischenablage und fremdem Editor.
+Es enthält konkrete Restrisiken und Sicherheits-Regressionen S01–S10.
+**Dies ist ein Dokumentations- und Planungsstand, kein bestandener
+Security-Test oder abgeschlossener Audit.** Ohne reale OS-/Netzwerktests,
+Paket-Signierung und Nachweise für Hochrisiken bleibt Issue #27 ein
+Release-Blocker.
+
 ## Was vorhanden ist
 
 - Deutsch-englische Tauri-Oberfläche mit Übersicht, Kurzanleitung, Mikrofonwahl, konfigurierbarem Tastenkürzel, Halten und Umschalten, Aufnahmepegel, Abbruch, Statussymbol und Kopiermöglichkeit. Einstellungen bleiben nach Neustart erhalten. Die App speichert keinen Diktatverlauf.
