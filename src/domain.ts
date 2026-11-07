@@ -49,7 +49,8 @@ export type Settings = {
 export type Initial = {
   settings: Settings; catalog: Model[];
   hardware: { cpu: string; threads: number; ram: number };
-  global_supported: boolean; tray_available: boolean; model_path: string; default_prompt: string;
+  global_supported: boolean; tray_available: boolean; autostart: boolean; autostart_error: string | null;
+  model_path: string; default_prompt: string;
 };
 export type Phase = 'idle' | 'recording' | 'transcribing' | 'cleaning' | 'inserting' | 'completed' | 'cancelled' | 'failed';
 export type Status = {

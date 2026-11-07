@@ -54,6 +54,7 @@ function App() {
   const [notice, setNotice] = useState('');
   const [saving, setSaving] = useState(false);
   const [microphones, setMicrophones] = useState<{ id: string; label: string }[]>([]);
+  const [autostart, setAutostart] = useState<boolean>();
   const locale = draft?.locale ?? 'de';
   const t: Copy = (de, en) => locale === 'de' ? de : en;
   const busy = inProgress(status);
@@ -68,6 +69,7 @@ function App() {
       setInitial(value);
       setSaved(value.settings);
       setDraft(value.settings);
+      setAutostart(value.autostart);
       const poll = async () => {
         if (stopped) return;
         let interval = 700;
@@ -98,6 +100,18 @@ function App() {
     setError('');
     try { setMicrophones(await invoke<typeof microphones>('microphones')); }
     catch (cause) { setError(String(cause)); }
+  };
+
+  const changeAutostart = async (enabled: boolean) => {
+    setError('');
+    setNotice('');
+    try {
+      const actual = await invoke<boolean>('set_autostart', { enabled });
+      setAutostart(actual);
+      setNotice(actual
+        ? t('Autostart ist eingeschaltet.', 'Autostart is enabled.')
+        : t('Autostart ist ausgeschaltet.', 'Autostart is disabled.'));
+    } catch (cause) { setError(String(cause)); }
   };
 
   if (!initial || !draft || !saved) return <main className="loading"><h1>Voicewright</h1><p role="status">{error || 'Wird geladen …'}</p></main>;
@@ -283,6 +297,22 @@ function App() {
           </select></Field>
           <label className="check"><input type="checkbox" checked={draft.auto_insert} onChange={(event) => update('auto_insert', event.target.checked)} />
             {t('Fertigen Text im geprüften Zielfenster einfügen', 'Insert finished text in the verified target window')}</label>
+        </Section>
+        <Section title={t('Start und Hintergrund', 'Startup and background')}>
+          <label className="check"><input type="checkbox" checked={autostart ?? initial.autostart}
+            onChange={(event) => void changeAutostart(event.target.checked)} />
+            {t('Beim Anmelden starten', 'Start at login')}</label>
+          <p className="muted small">{initial.tray_available
+            ? t('Voicewright startet ohne sichtbares Hauptfenster. Diktieren ist über das Kürzel und das Statussymbol möglich.', 'Voicewright starts without a visible main window. Dictate with the shortcut or the tray icon.')
+            : t('Ohne Statussymbol öffnet Voicewright beim Anmelden das Hauptfenster, damit die App erreichbar bleibt.', 'Without a tray icon Voicewright opens the main window at login so the app stays reachable.')}</p>
+          {initial.autostart_error && <p className="message error" role="alert">{initial.autostart_error}</p>}
+          {status?.shortcut_error && <p className="message error" role="alert">{status.shortcut_error}</p>}
+          <dl className="facts">
+            <div><dt>{t('Statussymbol', 'Tray icon')}</dt><dd>{initial.tray_available ? t('Verfügbar', 'Available') : t('Nicht verfügbar', 'Unavailable')}</dd></div>
+            <div><dt>{t('Globale Taste', 'Global shortcut')}</dt><dd>{status?.shortcut_active ? <kbd>{saved.shortcut}</kbd> : t('Nicht aktiv', 'Inactive')}</dd></div>
+            <div><dt>{t('Sprachmodell', 'Speech model')}</dt><dd>{installed.includes(saved.speech_model) ? t('Bereit', 'Ready') : t('Fehlt', 'Missing')}</dd></div>
+            <div><dt>{t('Mikrofone', 'Microphones')}</dt><dd>{microphones.length}</dd></div>
+          </dl>
         </Section>
       </>}
       {page === 'privacy' && <>

@@ -15,6 +15,7 @@ Installationspaket.
 ## Was vorhanden ist
 
 - Deutsch-englische Tauri-Oberfläche mit Übersicht, Kurzanleitung, Mikrofonwahl, konfigurierbarem Tastenkürzel, Halten und Umschalten, Aufnahmepegel, Abbruch, Statussymbol und Kopiermöglichkeit. Einstellungen bleiben nach Neustart erhalten. Die App speichert keinen Diktatverlauf.
+- Optionaler Autostart beim Anmelden über das offizielle Tauri-Plugin. Das Hauptfenster bleibt beim Autostart verborgen, wenn ein Statussymbol verfügbar ist, und öffnet sich sonst. Das Tray-Menü zeigt die Sitzungsphase und bietet Öffnen, Testdiktat, Stop, Abbruch, Kopieren, Autostart und Beenden. Beim Beenden wird eine laufende Sitzung abgebrochen und der Korrekturprozess beendet.
 - Lokale Whisper-Erkennung auf der CPU. Der Katalog enthält die mehrsprachigen Modelle Tiny, Base, Small, Medium, Large-v3 und Large-v3 Turbo. Downloads verwenden feste Modellversionen, Größen und SHA-256-Prüfsummen. Es gibt Abbruch, Fortsetzen, Löschen und Import. Beim Import prüft die App Formatkennung, GGUF-Version und Grundstruktur; vertauschte Formate sowie beschädigte oder unvollständige Dateien werden abgelehnt. Nur Whisper Base ist praktisch getestet.
 - Lokale Textkorrektur mit mitgeliefertem llama.cpp-Programm und Qwen3-0.6B-Q8_0. Eigene dichte Qwen3-GGUF-Modelle können importiert werden. Anweisungen, Vorlagen, Wörterliste und Ziel für Übersetzung sind einstellbar. Bei Fehlern bleibt der Originaltext verfügbar.
 - Optionale Cloud-Korrektur mit OpenAI, Gemini, Anthropic, xAI, OpenRouter, Mistral, Groq, DeepSeek, Together AI, Fireworks, Cerebras und eigenen kompatiblen Servern. Die App sendet Text nur im aktivierten Cloud-Modus. Schlüssel werden im Passwortspeicher des Betriebssystems abgelegt.
@@ -26,7 +27,8 @@ Installationspaket.
 | Prüfung | Ergebnis |
 | --- | --- |
 | Oberfläche am 7. November 2026 | TypeScript, ESLint, 3 Vitest-Tests und Vite-Produktionsbuild nach dem Branding-Wechsel bestanden. |
-| Rust-App am 7. November 2026 | Formatierung, Clippy mit `-D warnings` und 30 Standardtests im Podman-Build-Image bestanden. Darunter neue Tests für Burst-Ereignisse, verlorene Tastenlöse-Ereignisse, Abbruch während jeder Phase und Shortcut-Rollback. |
+| Rust-App am 7. November 2026 | Formatierung, Clippy mit `-D warnings` und 33 Standardtests im Podman-Build-Image bestanden. Darunter neue Tests für Burst-Ereignisse, verlorene Tastenlöse-Ereignisse, Abbruch während jeder Phase, Shortcut-Rollback, Autostart-Argument, Fenstersichtbarkeit und Tray-Texte. |
+| Autostart und Tray am 7. November 2026 | Tauri-Autostart-Plugin eingebunden, Linux-Build kompiliert. Die Unit-Tests prüfen Argument, Sichtbarkeitsentscheidung und Statusmenü. Drei Startläufe unter Xvfb bestanden: Normalstart sichtbar, Autostart mit nachgebildetem StatusNotifier-Host verborgen, Autostart ohne Tray-Host sichtbar. Der Host war ein kleiner Testdienst, kein echter Desktop-Tray. Ein echter Anmelde-, Tray- und Deinstallationslauf auf Windows, macOS und Linux steht aus. |
 | Korrekturprozess am 7. November 2026 | Formatierung, Clippy mit `-D warnings`, 3 Standardtests und 3 Protokolltests bestanden; der Modelltest bleibt ohne Gewichte übersprungen. |
 | Oberfläche am 6. November 2026 | TypeScript, ESLint, 3 Vitest-Tests, Vite-Produktionsbuild und npm-Audit bestanden. npm meldet 0 Schwachstellen. |
 | Rust-App auf Linux x64 | Formatierung, Clippy und 22 Standardtests bestanden. Davon 11 für Anbieter mit nachgebildeten Antworten. Keine bezahlten oder echten Cloud-Aufrufe. |
@@ -42,15 +44,20 @@ geprüft. NSIS, DMG und AppImage sind noch nicht gebaut. Die aktuelle
 x64-Build-Konfiguration der lokalen Korrektur verwendet AVX2 und verwandte
 Prozessorfunktionen. Ein Starttest auf älteren Prozessoren fehlt. Die
 Hotkey-Zustandsmaschine ist durch Unit-Tests abgedeckt; echte Tastaturtests
-auf Windows, macOS und X11 sowie Sleep/Wake- und RDP-Tests stehen aus.
+auf Windows, macOS und X11 sowie Sleep/Wake- und RDP-Tests stehen aus. Autostart
+und Tray sind durch Unit-Tests und drei Linux-Startläufe unter Xvfb belegt;
+dabei meldete ein nachgebildeter StatusNotifier-Host seine Verfügbarkeit.
+Ein echter Desktop-Tray, Anmeldung, Abmeldung, Deinstallation und das
+Verhalten ohne Statussymbol müssen auf jedem Zielsystem praktisch geprüft
+werden.
 
 ## Nächste Schritte
 
 1. **Prüfungen auf GitHub aktivieren.** Folge [github-workflows/README.md](github-workflows/README.md). Prüfe den Änderungsvorschlag auf Ubuntu und baue NSIS, DMG und AppImage. Prüfe, ob jedes Paket das Korrekturprogramm und alle nötigen Systembibliotheken enthält. Das lokale DEB ist ein Debug-Testpaket. Die Erstfreigabe braucht einen optimierten Paketbau.
-2. **Echte Desktop-Tests nachholen.** Prüfe physisches Mikrofon, Gerätewechsel und Trennung, Tastenkürzel und Abbruch während jeder Phase, Fokuswechsel, Sonderzeichen, Kopieren, Statussymbol bei geschlossenem Fenster und Installationsstart. Prüfe Passwortspeicher und Anbieter freiwillig mit eigenen Testschlüsseln. Wiederhole den automatisierten [Linux-Test](TESTING.md) mit dem endgültigen Paket.
+2. **Echte Desktop-Tests nachholen.** Prüfe physisches Mikrofon, Gerätewechsel und Trennung, Tastenkürzel und Abbruch während jeder Phase, Fokuswechsel, Sonderzeichen, Kopieren, Statussymbol bei geschlossenem Fenster und Installationsstart. Prüfe Autostart, Anmeldung, Tray-Menü und Deinstallation auf jedem Zielsystem. Prüfe Passwortspeicher und Anbieter freiwillig mit eigenen Testschlüsseln. Wiederhole den automatisierten [Linux-Test](TESTING.md) mit dem endgültigen Paket.
 3. **Einfügen und Wayland ergänzen.** Baue die macOS-Zugriffshilfe zur Prüfung des fokussierten Elements und zur Texteingabe. Prüfe das Desktop-Portal für Wayland-Tastenkürzel. Unterstütze mehrzeiligen Text nur mit sicherer, bestätigter Einfügung und Erhalt von Bild- und Textdaten in der Zwischenablage. Die aktuelle X11-Prüfung kennt das Fenster. Sie kann Wechsel zwischen Feldern derselben App nicht zuverlässig erkennen.
 4. **Modelle und Leistung vervollständigen.** Prüfe echte Downloads inklusive Unterbrechung, Bereichsantwort, Prüfsummenfehler und freien Speicher. Ergänze bessere Stille-Erkennung, robustere Modellimport-Prüfung, Parakeet V3 mit geprüftem sherpa-onnx-Modell, GPU-Erkennung und Beschleunigung mit CPU-Rückfall. Teste portable x64-Builds auf älteren CPUs. Dokumentiere Ende-zu-Ende-Zeiten, Spitzen-RAM und GPU-Verhalten auf echter Hardware.
-5. **Restliche Bedienung und Veröffentlichung.** Ergänze Systemstart, optionale Audiosignale und Diagnose. Manche System- und Anbieterfehler sind nur einsprachig. Prüfe die Lizenzhinweise der tatsächlich ausgelieferten Bibliotheken und RustSec-Warnungen. Führe den Arbeitszweig mit `main` zusammen, wenn die Prüfungen passen. Folge dann [RELEASE.md](RELEASE.md). Signierung, macOS-Notarisierung und authentifizierte Updates sind offen.
+5. **Restliche Bedienung und Veröffentlichung.** Ergänze optionale Audiosignale und Diagnose. Manche System- und Anbieterfehler sind nur einsprachig. Prüfe die Lizenzhinweise der tatsächlich ausgelieferten Bibliotheken und RustSec-Warnungen. Führe den Arbeitszweig mit `main` zusammen, wenn die Prüfungen passen. Folge dann [RELEASE.md](RELEASE.md). Signierung, macOS-Notarisierung und authentifizierte Updates sind offen.
 
 Für den Einstieg in den Quellcode siehe [ARCHITECTURE.md](ARCHITECTURE.md).
 Die Befehle stehen in [INSTALLATION.md](INSTALLATION.md) und

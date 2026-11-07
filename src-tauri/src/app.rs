@@ -13,13 +13,14 @@ use std::{
         atomic::{AtomicBool, Ordering},
         Arc, Mutex,
     },
-    time::Instant,
+    time::{Duration, Instant},
 };
 use tauri::{
-    menu::{Menu, MenuItem},
+    menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
     AppHandle, Manager, State, WindowEvent,
 };
+use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
@@ -27,11 +28,23 @@ struct AppState {
     root: PathBuf,
     hardware: Hardware,
     tray_available: AtomicBool,
+    tray: Mutex<Option<TrayHandles>>,
+    autostart: AtomicBool,
+    autostart_error: Mutex<Option<String>>,
     clipboard: Mutex<Option<arboard::Clipboard>>,
     inner: Mutex<Inner>,
 }
 
+struct TrayHandles {
+    status: MenuItem<tauri::Wry>,
+    start: MenuItem<tauri::Wry>,
+    stop: MenuItem<tauri::Wry>,
+    cancel: MenuItem<tauri::Wry>,
+    autostart: CheckMenuItem<tauri::Wry>,
+}
+
 const LEGACY_APP_IDENTIFIER: &str = "de.voxtakt.desktop";
+const AUTOSTART_ARG: &str = "--autostart";
 
 fn migrate_legacy_data(root: &Path) {
     if root.exists() {
@@ -107,6 +120,8 @@ struct Initial {
     hardware: Hardware,
     global_supported: bool,
     tray_available: bool,
+    autostart: bool,
+    autostart_error: Option<String>,
     model_path: PathBuf,
     default_prompt: &'static str,
 }
@@ -119,6 +134,8 @@ fn initial(state: State<'_, AppState>) -> Initial {
         hardware: state.hardware.clone(),
         global_supported: insertion::global_supported(),
         tray_available: state.tray_available.load(Ordering::Relaxed),
+        autostart: state.autostart.load(Ordering::Relaxed),
+        autostart_error: state.autostart_error.lock().unwrap().clone(),
         model_path: state.models(),
         default_prompt: settings::DEFAULT_PROMPT,
     }
@@ -180,6 +197,87 @@ fn replace_shortcuts(
         &|shortcut| app.global_shortcut().register(shortcut).is_ok(),
         &|shortcut| app.global_shortcut().unregister(shortcut).is_ok(),
     )
+}
+
+fn launched_from_autostart(args: impl IntoIterator<Item = String>) -> bool {
+    args.into_iter().any(|arg| arg == AUTOSTART_ARG)
+}
+
+fn should_show_on_startup(autostart: bool, tray_available: bool) -> bool {
+    // A hidden window without a tray icon would leave the app unreachable.
+    !autostart || !tray_available
+}
+
+#[cfg(target_os = "linux")]
+fn tray_host_available() -> bool {
+    use zbus::zvariant::Value;
+    let Ok(connection) = zbus::blocking::Connection::session() else {
+        return false;
+    };
+    let Ok(reply) = connection.call_method(
+        Some("org.kde.StatusNotifierWatcher"),
+        "/StatusNotifierWatcher",
+        Some("org.freedesktop.DBus.Properties"),
+        "Get",
+        &(
+            "org.kde.StatusNotifierWatcher",
+            "IsStatusNotifierHostRegistered",
+        ),
+    ) else {
+        return false;
+    };
+    matches!(
+        reply.body().deserialize::<Value<'_>>(),
+        Ok(Value::Bool(true))
+    )
+}
+
+#[cfg(not(target_os = "linux"))]
+fn tray_host_available() -> bool {
+    true
+}
+
+fn update_autostart(app: &AppHandle, state: &AppState, enabled: bool) -> Result<bool, String> {
+    let manager = app.autolaunch();
+    let result = if enabled {
+        manager.enable()
+    } else {
+        manager.disable()
+    };
+    if let Err(error) = result {
+        let message = format!("Could not update autostart. {error}");
+        *state.autostart_error.lock().unwrap() = Some(message.clone());
+        if let Ok(actual) = manager.is_enabled() {
+            state.autostart.store(actual, Ordering::Relaxed);
+            if let Some(handles) = state.tray.lock().unwrap().as_ref() {
+                let _ = handles.autostart.set_checked(actual);
+            }
+        }
+        return Err(message);
+    }
+    let actual = match manager.is_enabled() {
+        Ok(actual) => actual,
+        Err(error) => {
+            let message = format!("Could not read the autostart state. {error}");
+            *state.autostart_error.lock().unwrap() = Some(message.clone());
+            return Err(message);
+        }
+    };
+    state.autostart.store(actual, Ordering::Relaxed);
+    *state.autostart_error.lock().unwrap() = None;
+    if let Some(handles) = state.tray.lock().unwrap().as_ref() {
+        let _ = handles.autostart.set_checked(actual);
+    }
+    Ok(actual)
+}
+
+#[tauri::command]
+fn set_autostart(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    enabled: bool,
+) -> Result<bool, String> {
+    update_autostart(&app, &state, enabled)
 }
 
 #[tauri::command]
@@ -281,18 +379,25 @@ fn start_session(app: &AppHandle, from_hotkey: bool) -> Result<(), String> {
     Ok(())
 }
 
+fn tray_label(phase: Phase, has_warning: bool) -> &'static str {
+    match phase {
+        Phase::Idle => "Voicewright · Bereit / Ready",
+        Phase::Recording => "Voicewright · ● Aufnahme / Recording",
+        Phase::Transcribing => "Voicewright · Spracherkennung / Transcribing",
+        Phase::Cleaning => "Voicewright · Textkorrektur / Editing",
+        Phase::Inserting => "Voicewright · Text wird eingefügt / Inserting",
+        Phase::Cancelled => "Voicewright · Abgebrochen / Cancelled",
+        Phase::Failed => "Voicewright · Fehler / Error",
+        Phase::Completed if has_warning => "Voicewright · Text zum Kopieren / Text ready to copy",
+        Phase::Completed => "Voicewright · Fertig / Completed",
+    }
+}
+
 fn set_tray_status(app: &AppHandle, phase: Phase, has_warning: bool) {
     let Some(tray) = app.tray_by_id("main") else {
         return;
     };
-    let text = match phase {
-        Phase::Recording => "Voicewright · ● Aufnahme / Recording",
-        Phase::Transcribing => "Voicewright · Spracherkennung / Transcribing",
-        Phase::Cleaning => "Voicewright · Textkorrektur / Editing",
-        Phase::Failed => "Voicewright · Fehler / Error",
-        Phase::Completed if has_warning => "Voicewright · Text zum Kopieren / Text ready to copy",
-        _ => "Voicewright",
-    };
+    let text = tray_label(phase, has_warning);
     let _ = tray.set_tooltip(Some(text));
     let image = if phase == Phase::Recording {
         Some(tauri::include_image!("icons/recording.png"))
@@ -300,6 +405,15 @@ fn set_tray_status(app: &AppHandle, phase: Phase, has_warning: bool) {
         app.default_window_icon().cloned()
     };
     let _ = tray.set_icon(image);
+    let state = app.state::<AppState>();
+    let tray_state = state.tray.lock().unwrap();
+    if let Some(handles) = tray_state.as_ref() {
+        let _ = handles.status.set_text(text);
+        let busy = phase.busy();
+        let _ = handles.start.set_enabled(!busy);
+        let _ = handles.stop.set_enabled(phase == Phase::Recording);
+        let _ = handles.cancel.set_enabled(busy);
+    }
 }
 
 fn set_phase(app: &AppHandle, session: u64, phase: Phase) {
@@ -709,23 +823,70 @@ fn show(app: &AppHandle) {
 }
 
 fn tray(app: &AppHandle) -> tauri::Result<()> {
+    let status = MenuItem::with_id(
+        app,
+        "status",
+        tray_label(Phase::Idle, false),
+        false,
+        None::<&str>,
+    )?;
     let open = MenuItem::with_id(app, "open", "Voicewright öffnen / Open", true, None::<&str>)?;
-    let stop_item = MenuItem::with_id(app, "stop", "Aufnahme beenden / Stop", true, None::<&str>)?;
+    let start = MenuItem::with_id(
+        app,
+        "start",
+        "Testdiktat starten / Start test dictation",
+        true,
+        None::<&str>,
+    )?;
+    let stop_item = MenuItem::with_id(app, "stop", "Aufnahme beenden / Stop", false, None::<&str>)?;
     let cancel_item = MenuItem::with_id(
         app,
         "cancel",
         "Diktat abbrechen / Cancel",
-        true,
+        false,
         None::<&str>,
     )?;
     let copy = MenuItem::with_id(app, "copy", "Text kopieren / Copy", true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, "quit", "Beenden / Quit", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&open, &stop_item, &cancel_item, &copy, &quit])?;
+    let autostart = app.state::<AppState>().autostart.load(Ordering::Relaxed);
+    let autostart_item = CheckMenuItem::with_id(
+        app,
+        "autostart",
+        "Bei Anmeldung starten / Start at login",
+        true,
+        autostart,
+        None::<&str>,
+    )?;
+    let quit_item = MenuItem::with_id(app, "quit", "Beenden / Quit", true, None::<&str>)?;
+    let first = PredefinedMenuItem::separator(app)?;
+    let second = PredefinedMenuItem::separator(app)?;
+    let third = PredefinedMenuItem::separator(app)?;
+    let menu = Menu::with_items(
+        app,
+        &[
+            &status,
+            &first,
+            &open,
+            &start,
+            &stop_item,
+            &cancel_item,
+            &copy,
+            &second,
+            &autostart_item,
+            &third,
+            &quit_item,
+        ],
+    )?;
     let mut tray = TrayIconBuilder::with_id("main")
         .menu(&menu)
         .tooltip("Voicewright")
         .on_menu_event(|app, event| match event.id().as_ref() {
             "open" => show(app),
+            "start" => {
+                if let Err(error) = start_session(app, false) {
+                    fail_shortcut(app, error);
+                    show(app);
+                }
+            }
             "stop" => stop(app.state()),
             "cancel" => cancel(app.clone()),
             "copy" => {
@@ -736,20 +897,56 @@ fn tray(app: &AppHandle) -> tauri::Result<()> {
                     }
                 });
             }
-            "quit" => app.exit(0),
+            "autostart" => {
+                let state = app.state::<AppState>();
+                let enabled = state
+                    .tray
+                    .lock()
+                    .unwrap()
+                    .as_ref()
+                    .and_then(|handles| handles.autostart.is_checked().ok())
+                    .unwrap_or(false);
+                if let Err(error) = update_autostart(app, &state, enabled) {
+                    fail_shortcut(app, error);
+                    show(app);
+                }
+            }
+            "quit" => quit(app),
             _ => {}
         });
     if let Some(icon) = app.default_window_icon() {
         tray = tray.icon(icon.clone());
     }
     tray.build(app)?;
+    *app.state::<AppState>().tray.lock().unwrap() = Some(TrayHandles {
+        status,
+        start,
+        stop: stop_item,
+        cancel: cancel_item,
+        autostart: autostart_item,
+    });
     Ok(())
+}
+
+fn quit(app: &AppHandle) {
+    // Give the running pipeline a moment to observe the cancellation and
+    // kill the bundled cleanup process before the event loop exits.
+    cancel(app.clone());
+    let app = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(250));
+        app.exit(0);
+    });
 }
 
 pub fn run() {
     whisper_rs::install_logging_hooks();
     let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _, _| show(app)))
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec![AUTOSTART_ARG]),
+        ))
         .plugin(tauri_plugin_dialog::init());
     if insertion::global_supported() {
         builder = builder.plugin(
@@ -775,6 +972,13 @@ pub fn run() {
             });
             let next = shortcuts(&settings);
             let system = sysinfo::System::new_all();
+            let (autostart, autostart_error) = match app.autolaunch().is_enabled() {
+                Ok(enabled) => (enabled, None),
+                Err(error) => (
+                    false,
+                    Some(format!("Could not read the autostart state. {error}")),
+                ),
+            };
             app.manage(AppState {
                 root,
                 hardware: Hardware {
@@ -786,6 +990,9 @@ pub fn run() {
                     ram: system.total_memory(),
                 },
                 tray_available: AtomicBool::new(false),
+                tray: Mutex::new(None),
+                autostart: AtomicBool::new(autostart),
+                autostart_error: Mutex::new(autostart_error),
                 clipboard: Mutex::new(None),
                 inner: Mutex::new(Inner {
                     settings,
@@ -801,13 +1008,20 @@ pub fn run() {
                 }),
             });
             let state = app.state::<AppState>();
+            let tray_available = tray(app.handle()).is_ok() && tray_host_available();
             state
                 .tray_available
-                .store(tray(app.handle()).is_ok(), Ordering::Relaxed);
+                .store(tray_available, Ordering::Relaxed);
             let shortcut_result = replace_shortcuts(app.handle(), &[], &next);
             let mut inner = state.inner.lock().unwrap();
             inner.shortcut_active = shortcut_result.is_ok() && insertion::global_supported();
             inner.shortcut_error = shortcut_result.err();
+            drop(inner);
+            let autostart_launch = launched_from_autostart(std::env::args());
+            let tray_available = state.tray_available.load(Ordering::Relaxed);
+            if should_show_on_startup(autostart_launch, tray_available) {
+                show(app.handle());
+            }
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -824,6 +1038,7 @@ pub fn run() {
             status,
             microphones,
             save_settings,
+            set_autostart,
             start_test,
             stop,
             cancel,
@@ -869,5 +1084,37 @@ mod tests {
             "{\"current\":true}"
         );
         assert!(legacy.exists());
+    }
+
+    #[test]
+    fn detects_the_autostart_argument() {
+        assert!(launched_from_autostart(["--autostart".to_owned()]));
+        assert!(launched_from_autostart([
+            "--other".to_owned(),
+            "--autostart".to_owned()
+        ]));
+        assert!(!launched_from_autostart(["--autostart=1".to_owned()]));
+        assert!(!launched_from_autostart(Vec::new()));
+    }
+
+    #[test]
+    fn keeps_the_window_hidden_only_when_a_tray_is_available() {
+        assert!(!should_show_on_startup(true, true));
+        assert!(should_show_on_startup(true, false));
+        assert!(should_show_on_startup(false, true));
+        assert!(should_show_on_startup(false, false));
+    }
+
+    #[test]
+    fn tray_text_describes_every_phase() {
+        assert!(tray_label(Phase::Idle, false).contains("Bereit"));
+        assert!(tray_label(Phase::Recording, false).contains("Aufnahme"));
+        assert!(tray_label(Phase::Transcribing, false).contains("Spracherkennung"));
+        assert!(tray_label(Phase::Cleaning, false).contains("Textkorrektur"));
+        assert!(tray_label(Phase::Inserting, false).contains("eingefügt"));
+        assert!(tray_label(Phase::Cancelled, false).contains("Abgebrochen"));
+        assert!(tray_label(Phase::Failed, false).contains("Fehler"));
+        assert!(tray_label(Phase::Completed, false).contains("Fertig"));
+        assert!(tray_label(Phase::Completed, true).contains("Kopieren"));
     }
 }

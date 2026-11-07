@@ -17,6 +17,10 @@ Veröffentlichungsablauf erzeugt und welche Prüfungen erforderlich sind.
    Aufnehmen und kopierst das Ergebnis bei Bedarf selbst.
 4. Lade in der App ein Sprachmodell herunter. Probiere anschließend ein kurzes
    Diktat mit einem leeren Testdokument.
+5. Optional: Aktiviere unter **Einstellungen → Start und Hintergrund** den
+   Autostart. Voicewright startet dann beim Anmelden. Mit verfügbarem
+   Statussymbol bleibt das Hauptfenster geschlossen; ohne Statussymbol öffnet
+   es sich. Autostart lässt sich dort jederzeit wieder ausschalten.
 
 Für veröffentlichte Pakete sind Node.js, Python und Rust zur Nutzung
 entbehrlich. Windows verwendet die WebView2-Laufzeit. Linux nutzt

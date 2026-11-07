@@ -62,11 +62,20 @@ den Testlauf auch ohne Netz wiederholen.
 4. Prüfe mit Text und Bild in der Zwischenablage, was die Einfügung
    verändert. Prüfe Aufnahme bei geschlossenem Hauptfenster und den
    Wiedereinstieg über das Statussymbol.
-5. Teste die Geräteauswahl mit zwei Mikrofonen. Trenne das aktive Mikrofon
+5. Schalte Autostart in den Einstellungen ein. Prüfe die Registrierung im
+   System (Windows: Start-Apps, macOS: Anmeldeobjekte, Linux:
+   `~/.config/autostart/`). Melde dich ab und wieder an. Erwartet: kein
+   sichtbares Hauptfenster, das Diktatkürzel funktioniert, das Tray-Menü zeigt
+   den Status. Öffne das Fenster über das Tray-Menü, schalte Autostart wieder
+   aus und prüfe, dass der Systemeintrag verschwindet. Beende die App über
+   „Beenden“ während einer Aufnahme und prüfe, dass kein Korrekturprozess
+   weiterläuft. Wiederhole den Test ohne verfügbares Statussymbol: Dann muss
+   sich das Hauptfenster öffnen.
+6. Teste die Geräteauswahl mit zwei Mikrofonen. Trenne das aktive Mikrofon
    während einer Aufnahme. Simuliere verweigerten Mikrofonzugriff.
-6. Unterbrich einen Download. Prüfe die Auswahl von unvollständigen
+7. Unterbrich einen Download. Prüfe die Auswahl von unvollständigen
    Dateien und den Wechsel zwischen zwei fertigen Sprachmodellen.
-7. Teste Anbieter getrennt und freiwillig mit kurzen Testtexten und
+8. Teste Anbieter getrennt und freiwillig mit kurzen Testtexten und
    Testschlüsseln. Prüfe Fehler für abgelehnten Schlüssel, überschrittenes
    Limit, Zeitüberschreitung und Verbindungsabbruch.
 
