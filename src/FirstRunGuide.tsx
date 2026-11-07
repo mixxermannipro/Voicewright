@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Initial, Settings, Status } from './domain';
+import { canAdvanceSetup, type Initial, type Settings, type Status } from './domain';
 
 type Copy = (de: string, en: string) => string;
 type Destination = 'models' | 'cleanup' | 'settings' | 'privacy';
@@ -28,7 +28,7 @@ export function FirstRunGuide({
   const ready = installed.includes(settings.speech_model);
   const recording = status?.phase === 'recording';
   const dictating = ['recording', 'transcribing', 'cleaning', 'inserting'].includes(status?.phase ?? '');
-  const tested = status?.phase === 'completed' && Boolean(status.transcript?.trim());
+  const tested = status?.phase === 'completed' && Boolean(status?.transcript?.trim());
   const downloading = status?.download?.active === true;
   const selected = catalog.find((item) => item.id === settings.speech_model);
   const base = catalog.find((item) => item.id === 'whisper-base');
@@ -43,6 +43,7 @@ export function FirstRunGuide({
     t('Tastenkürzel', 'Shortcut'),
   ];
   const blocked = !canSaveProgress || saving || dictating;
+  const mayAdvance = canAdvanceSetup(step, ready, status, confirmedExternal);
   const next = (newStep: number, complete = false) => { void onProgress(newStep, complete); };
 
   return <section className="panel first-run-guide" aria-label={t('Ersteinrichtung', 'First-run setup')}>
@@ -91,6 +92,10 @@ export function FirstRunGuide({
         onClick={() => void onExecute('download_model', { id: 'whisper-base' })}>
         {t('Whisper Base laden', 'Download Whisper Base')}
       </button>}
+      {status?.download?.error && <p className="message error" role="alert">{t(
+        'Modelldownload fehlgeschlagen. Prüfe freien Speicherplatz und Internetverbindung; versuche es erneut.',
+        'Model download failed. Check available disk space and your connection, then retry.',
+      )}</p>}
       {downloading && status?.download && <>
         <p role="status">{t('Download läuft', 'Downloading')}: {status.download.id}</p>
         <progress aria-label={t('Modelldownload', 'Model download')}
@@ -182,11 +187,11 @@ export function FirstRunGuide({
       {step > 0 && <button type="button" disabled={blocked} onClick={() => next(step - 1)}>
         {t('Zurück', 'Back')}</button>}
       {step < 3 ? <button type="button" className="primary"
-        disabled={blocked || (step === 1 && !ready) || (step === 2 && !tested)}
+        disabled={blocked || !mayAdvance}
         onClick={() => next(step + 1)}>
         {saving ? t('Speichert …', 'Saving…') : t('Weiter', 'Continue')}
       </button> : <button type="button" className="primary"
-        disabled={blocked || !confirmedExternal}
+        disabled={blocked || !mayAdvance}
         onClick={() => next(3, true)}>
         {t('Einrichtung abschließen', 'Finish setup')}
       </button>}
