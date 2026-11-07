@@ -53,6 +53,8 @@ pub struct Settings {
     pub presets: BTreeMap<String, String>,
     pub translation: String,
     pub vocabulary: String,
+    /// Opt-in only: transform explicit spoken punctuation in the transcript.
+    pub spoken_formatting: bool,
     pub fallback: bool,
     pub auto_insert: bool,
     pub shortcut: String,
@@ -76,6 +78,7 @@ impl Default for Settings {
             presets: BTreeMap::new(),
             translation: String::new(),
             vocabulary: String::new(),
+            spoken_formatting: false,
             fallback: true,
             auto_insert: true,
             shortcut: "Ctrl+Shift+Space".into(),
