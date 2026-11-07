@@ -11,6 +11,7 @@ mod session;
 mod settings;
 mod settings_portable;
 mod speech;
+mod spoken_format;
 
 fn main() {
     app::run();
