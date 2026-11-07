@@ -12,6 +12,22 @@ werden weiterhin gelesen; beim nächsten Speichern werden sie unter dem neuen
 Dienstnamen abgelegt. Für diese Version gibt es noch kein veröffentlichtes
 Installationspaket.
 
+## Prompt-Härtung – Implementierung in Issue #17
+
+Auf einem separaten Feature-Branch liegt eine erweiterte Standardanweisung,
+ein opt-in-Vorschautest mit noch nicht gespeicherten Einstellungen und eine
+konservative Ausgabevalidierung. Beim normalen Diktat greift bei abgewiesenen
+KI-Ausgaben der vorhandene Original-Fallback (sofern aktiviert). Für
+Cloud-Vorschauen ist ein ausdrücklicher Klick mit Bestätigung erforderlich;
+dabei werden Testtext und Anweisung an den gewählten Anbieter gesendet,
+keine Mikrofonaufnahme.
+
+**Noch ausstehend:** vollständige npm-/Cargo-Prüfungen und echte
+Modell-Evaluation in Windows/macOS/Linux. Die Golden-Fälle in
+[TESTING.md](TESTING.md) sind eine manuelle Checkliste, kein bereits
+bestandener Qualitätsnachweis. Der Validator erkennt keine subtilen
+Bedeutungsänderungen oder Halluzinationen.
+
 ## Was vorhanden ist
 
 - Deutsch-englische Tauri-Oberfläche mit Übersicht, Kurzanleitung, Mikrofonwahl, konfigurierbarem Tastenkürzel, Halten und Umschalten, Aufnahmepegel, Abbruch, Statussymbol und Kopiermöglichkeit. Einstellungen bleiben nach Neustart erhalten. Die App speichert keinen Diktatverlauf.

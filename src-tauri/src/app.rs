@@ -1,6 +1,6 @@
 use crate::{
     audio::{self, Capture},
-    cleanup, insertion, models, providers,
+    cleanup, guard, insertion, models, providers,
     session::{apply_shortcut_changes, Action, HotkeyState, Phase, ShortcutKind, Status},
     settings::{self, CleanupMode, RecordingMode, Settings},
     speech,
@@ -215,6 +215,42 @@ fn save_settings(
     Ok(())
 }
 
+#[tauri::command]
+async fn preview_cleanup(
+    app: AppHandle,
+    value: Settings,
+    transcript: String,
+) -> Result<String, String> {
+    value.validate()?;
+    if transcript.trim().is_empty() || transcript.len() > 8_192 {
+        return Err("Enter a short, non-empty sample dictation.".into());
+    }
+    let state = app.state::<AppState>();
+    {
+        let inner = state.inner.lock().unwrap();
+        if inner.status.phase.busy() || inner.transfer.is_some() {
+            return Err("Finish dictation or model operations before testing the prompt.".into());
+        }
+    }
+    let system = value.system_prompt();
+    let cancelled = AtomicBool::new(false);
+    let edited = match value.cleanup_mode {
+        CleanupMode::Off => return Err("Enable local or cloud editing to test the prompt.".into()),
+        CleanupMode::Local => {
+            let model = models::ready(&state.models(), &value.cleanup_model)?;
+            cleanup::local(&model, &system, &transcript, &cancelled).await?
+        }
+        CleanupMode::Cloud => {
+            let provider = value
+                .providers
+                .get(&value.active_provider)
+                .ok_or("Configure the chosen cloud provider first.")?;
+            providers::cleanup(provider, &system, &transcript).await?
+        }
+    };
+    guard::validate(&transcript, edited)
+}
+
 fn start_session(app: &AppHandle, from_hotkey: bool) -> Result<(), String> {
     let state = app.state::<AppState>();
     let mut inner = state.inner.lock().unwrap();
@@ -383,7 +419,7 @@ async fn pipeline(
         if control.cancelled.load(Ordering::Relaxed) || !current_session(app, session) {
             return Ok(());
         }
-        match edited {
+        match edited.and_then(|text| guard::validate(&transcript, text)) {
             Ok(text) => text,
             Err(error) if settings.fallback => {
                 warning = Some(format!("Cleanup failed. Original text retained. {error}"));
@@ -824,6 +860,7 @@ pub fn run() {
             status,
             microphones,
             save_settings,
+            preview_cleanup,
             start_test,
             stop,
             cancel,
