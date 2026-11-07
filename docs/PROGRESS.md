@@ -56,3 +56,17 @@ Für den Einstieg in den Quellcode siehe [ARCHITECTURE.md](ARCHITECTURE.md).
 Die Befehle stehen in [INSTALLATION.md](INSTALLATION.md) und
 [TESTING.md](TESTING.md). Die beiden Cargo-Lockdateien und
 `package-lock.json` gehören zum Stand.
+
+---
+
+## Sicherheitsreview (Issue #27)
+
+Das [Bedrohungsmodell](THREAT_MODEL.md) dokumentiert die Vertrauensgrenzen
+zwischen Mikrofon, nativem ASR/LLM-Prozess, optionalem Cloud-Anbieter,
+Modellserver, Tauri-Webview, OS-Zwischenablage und fremdem Editor.
+Es enthält konkrete Restrisiken und Sicherheits-Regressionen S01–S10.
+**Dies ist ein Dokumentations- und Planungsstand, kein bestandener
+Security-Test oder abgeschlossener Audit.** Ohne reale OS-/Netzwerktests,
+Paket-Signierung und Nachweise für Hochrisiken bleibt Issue #27 ein
+Release-Blocker.
+
