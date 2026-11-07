@@ -26,7 +26,7 @@ Installationspaket.
 | Prüfung | Ergebnis |
 | --- | --- |
 | Oberfläche am 7. November 2026 | TypeScript, ESLint, 3 Vitest-Tests und Vite-Produktionsbuild nach dem Branding-Wechsel bestanden. |
-| Rust-App am 7. November 2026 | Formatierung, Clippy mit `-D warnings` und 22 Standardtests im Podman-Build-Image bestanden. |
+| Rust-App am 7. November 2026 | Formatierung, Clippy mit `-D warnings` und 30 Standardtests im Podman-Build-Image bestanden. Darunter neue Tests für Burst-Ereignisse, verlorene Tastenlöse-Ereignisse, Abbruch während jeder Phase und Shortcut-Rollback. |
 | Korrekturprozess am 7. November 2026 | Formatierung, Clippy mit `-D warnings`, 3 Standardtests und 3 Protokolltests bestanden; der Modelltest bleibt ohne Gewichte übersprungen. |
 | Oberfläche am 6. November 2026 | TypeScript, ESLint, 3 Vitest-Tests, Vite-Produktionsbuild und npm-Audit bestanden. npm meldet 0 Schwachstellen. |
 | Rust-App auf Linux x64 | Formatierung, Clippy und 22 Standardtests bestanden. Davon 11 für Anbieter mit nachgebildeten Antworten. Keine bezahlten oder echten Cloud-Aufrufe. |
@@ -40,7 +40,9 @@ Der virtuelle Linux-Test verwendet künstliche Eingabe und kein physisches
 Mikrofon. Windows, macOS und Linux Wayland wurden praktisch noch nicht
 geprüft. NSIS, DMG und AppImage sind noch nicht gebaut. Die aktuelle
 x64-Build-Konfiguration der lokalen Korrektur verwendet AVX2 und verwandte
-Prozessorfunktionen. Ein Starttest auf älteren Prozessoren fehlt.
+Prozessorfunktionen. Ein Starttest auf älteren Prozessoren fehlt. Die
+Hotkey-Zustandsmaschine ist durch Unit-Tests abgedeckt; echte Tastaturtests
+auf Windows, macOS und X11 sowie Sleep/Wake- und RDP-Tests stehen aus.
 
 ## Nächste Schritte
 

@@ -55,6 +55,10 @@ den Testlauf auch ohne Netz wiederholen.
 3. Starte mit einem leeren Textfeld in einer anderen App. Prüfe Halten und
    Umschalten, Wiederholung der Taste, Fokuswechsel während der Verarbeitung
    und Abbruch. Prüfe, wie der Text nach gescheiterter Einfügung abrufbar bleibt.
+   Halte die Diktattaste über das Ende einer Sitzung hinaus gedrückt und prüfe,
+   dass ein erneuter Druck erst nach dem Loslassen wieder startet. Trenne während
+   einer Aufnahme die Tastatur oder sperre die Sitzung und prüfe, ob der Zustand
+   sichtbar und ohne Doppeleinfügung endet.
 4. Prüfe mit Text und Bild in der Zwischenablage, was die Einfügung
    verändert. Prüfe Aufnahme bei geschlossenem Hauptfenster und den
    Wiedereinstieg über das Statussymbol.

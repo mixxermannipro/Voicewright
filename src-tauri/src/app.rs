@@ -1,7 +1,7 @@
 use crate::{
     audio::{self, Capture},
     cleanup, insertion, models, providers,
-    session::{Action, Phase, ShortcutPress, Status},
+    session::{apply_shortcut_changes, Action, HotkeyState, Phase, ShortcutKind, Status},
     settings::{self, CleanupMode, RecordingMode, Settings},
     speech,
 };
@@ -54,7 +54,8 @@ struct Inner {
     capture: Option<Arc<Capture>>,
     shortcut_error: Option<String>,
     shortcut_active: bool,
-    press: ShortcutPress,
+    press: HotkeyState,
+    session: u64,
     started_from_hotkey: bool,
     transfer: Option<Arc<AtomicBool>>,
     download: Option<Download>,
@@ -173,26 +174,12 @@ fn replace_shortcuts(
     if !insertion::global_supported() {
         return Ok(());
     }
-    let global = app.global_shortcut();
-    let mut added = Vec::new();
-    for shortcut in next.iter().filter(|shortcut| !previous.contains(shortcut)) {
-        if global.register(*shortcut).is_err() {
-            for item in added {
-                let _ = global.unregister(item);
-            }
-            return Err("This shortcut is unavailable or is already assigned.".into());
-        }
-        added.push(*shortcut);
-    }
-    for shortcut in previous.iter().filter(|shortcut| !next.contains(shortcut)) {
-        if global.unregister(*shortcut).is_err() {
-            for item in added {
-                let _ = global.unregister(item);
-            }
-            return Err("Could not release the previous shortcut.".into());
-        }
-    }
-    Ok(())
+    apply_shortcut_changes(
+        previous,
+        next,
+        &|shortcut| app.global_shortcut().register(shortcut).is_ok(),
+        &|shortcut| app.global_shortcut().unregister(shortcut).is_ok(),
+    )
 }
 
 #[tauri::command]
@@ -224,7 +211,7 @@ fn save_settings(
     inner.settings = value;
     inner.shortcut_error = None;
     inner.shortcut_active = insertion::global_supported();
-    inner.press = ShortcutPress::default();
+    inner.press.reset();
     Ok(())
 }
 
@@ -246,6 +233,8 @@ fn start_session(app: &AppHandle, from_hotkey: bool) -> Result<(), String> {
         None
     };
     let control = Arc::new(Capture::default());
+    inner.session = inner.session.wrapping_add(1);
+    let session = inner.session;
     inner.capture = Some(control.clone());
     inner.started_from_hotkey = from_hotkey;
     inner.status.phase = Phase::Recording;
@@ -263,10 +252,14 @@ fn start_session(app: &AppHandle, from_hotkey: bool) -> Result<(), String> {
             &speech_model,
             target,
             control.clone(),
+            session,
         )
         .await;
         let state = app.state::<AppState>();
         let mut inner = state.inner.lock().unwrap();
+        if inner.session != session {
+            return;
+        }
         inner.status.recording_since = None;
         inner.capture = None;
         if control.cancelled.load(Ordering::Relaxed) {
@@ -309,13 +302,20 @@ fn set_tray_status(app: &AppHandle, phase: Phase, has_warning: bool) {
     let _ = tray.set_icon(image);
 }
 
-fn set_phase(app: &AppHandle, phase: Phase) {
+fn set_phase(app: &AppHandle, session: u64, phase: Phase) {
     let state = app.state::<AppState>();
     let mut inner = state.inner.lock().unwrap();
+    if inner.session != session {
+        return;
+    }
     inner.status.phase = phase;
     inner.status.recording_since = None;
     drop(inner);
     set_tray_status(app, phase, false);
+}
+
+fn current_session(app: &AppHandle, session: u64) -> bool {
+    app.state::<AppState>().inner.lock().unwrap().session == session
 }
 
 async fn pipeline(
@@ -325,17 +325,18 @@ async fn pipeline(
     speech_model: &Path,
     target: Option<insertion::Target>,
     control: Arc<Capture>,
+    session: u64,
 ) -> Result<(), String> {
     let device = settings.microphone.clone();
     let capture = control.clone();
     let audio = blocking(move || audio::record(device.as_deref(), capture)).await?;
-    if control.cancelled.load(Ordering::Relaxed) {
+    if control.cancelled.load(Ordering::Relaxed) || !current_session(app, session) {
         return Ok(());
     }
     if !audio::has_voice(&audio) {
         return Err("No speech was detected.".into());
     }
-    set_phase(app, Phase::Transcribing);
+    set_phase(app, session, Phase::Transcribing);
     let model = speech_model.to_owned();
     let language = settings.speech_language.clone();
     let vocabulary = settings.vocabulary.clone();
@@ -344,7 +345,7 @@ async fn pipeline(
         speech::transcribe(&model, &audio, &language, &vocabulary, &capture.cancelled)
     })
     .await?;
-    if control.cancelled.load(Ordering::Relaxed) {
+    if control.cancelled.load(Ordering::Relaxed) || !current_session(app, session) {
         return Ok(());
     }
     if transcript.is_empty() {
@@ -352,12 +353,18 @@ async fn pipeline(
     }
 
     let state = app.state::<AppState>();
-    state.inner.lock().unwrap().status.transcript = Some(transcript.clone());
+    {
+        let mut inner = state.inner.lock().unwrap();
+        if inner.session != session {
+            return Ok(());
+        }
+        inner.status.transcript = Some(transcript.clone());
+    }
     let mut warning = None;
     let result = if settings.cleanup_mode == CleanupMode::Off {
         transcript
     } else {
-        set_phase(app, Phase::Cleaning);
+        set_phase(app, session, Phase::Cleaning);
         let system = settings.system_prompt();
         let edited = match settings.cleanup_mode {
             CleanupMode::Local => match models::ready(model_root, &settings.cleanup_model) {
@@ -373,7 +380,7 @@ async fn pipeline(
             },
             CleanupMode::Off => unreachable!(),
         };
-        if control.cancelled.load(Ordering::Relaxed) {
+        if control.cancelled.load(Ordering::Relaxed) || !current_session(app, session) {
             return Ok(());
         }
         match edited {
@@ -391,18 +398,28 @@ async fn pipeline(
     };
     let from_hotkey = {
         let mut inner = state.inner.lock().unwrap();
+        if inner.session != session {
+            return Ok(());
+        }
         inner.status.transcript = Some(result.clone());
         inner.started_from_hotkey
     };
     if let Some(target) = target {
-        set_phase(app, Phase::Inserting);
+        set_phase(app, session, Phase::Inserting);
+        if !current_session(app, session) {
+            return Ok(());
+        }
         let capture = control.clone();
         let inserted = blocking(move || {
             insertion::insert(target, &result, &capture.cancelled).map_err(str::to_owned)
         })
         .await;
+        let mut inner = state.inner.lock().unwrap();
+        if inner.session != session {
+            return Ok(());
+        }
         match inserted {
-            Ok(()) => state.inner.lock().unwrap().status.inserted = true,
+            Ok(()) => inner.status.inserted = true,
             Err(error) => append_warning(&mut warning, error),
         }
     } else if from_hotkey {
@@ -411,7 +428,10 @@ async fn pipeline(
             "The result is available to copy in Voicewright.".into(),
         );
     }
-    state.inner.lock().unwrap().status.warning = warning;
+    let mut inner = state.inner.lock().unwrap();
+    if inner.session == session {
+        inner.status.warning = warning;
+    }
     Ok(())
 }
 
@@ -440,31 +460,26 @@ fn handle_shortcut(app: &AppHandle, shortcut: &Shortcut, state: ShortcutState) {
     let app_state = app.state::<AppState>();
     let mut inner = app_state.inner.lock().unwrap();
     let pressed = state == ShortcutState::Pressed;
-    if inner
+    let kind = if inner
         .settings
         .cancel_shortcut
         .parse::<Shortcut>()
         .is_ok_and(|cancel| cancel.id() == shortcut.id())
     {
-        if pressed {
-            if let Some(capture) = &inner.capture {
-                capture.cancelled.store(true, Ordering::Relaxed);
-                capture.stop.store(true, Ordering::Relaxed);
-            }
-        }
-        return;
-    }
-    if !inner
+        ShortcutKind::Cancel
+    } else if inner
         .settings
         .shortcut
         .parse::<Shortcut>()
         .is_ok_and(|current| current.id() == shortcut.id())
     {
+        ShortcutKind::Dictation
+    } else {
         return;
-    }
+    };
     let hold = inner.settings.recording_mode == RecordingMode::Hold;
     let phase = inner.status.phase;
-    match inner.press.change(pressed, hold, phase) {
+    match inner.press.change(kind, pressed, hold, phase) {
         Some(Action::Start) => {
             drop(inner);
             if let Err(error) = start_session(app, true) {
@@ -475,6 +490,10 @@ fn handle_shortcut(app: &AppHandle, shortcut: &Shortcut, state: ShortcutState) {
             if let Some(capture) = &inner.capture {
                 capture.stop.store(true, Ordering::Relaxed);
             }
+        }
+        Some(Action::Cancel) => {
+            drop(inner);
+            cancel(app.clone());
         }
         _ => {}
     }
@@ -496,11 +515,25 @@ fn stop(state: State<'_, AppState>) {
 }
 
 #[tauri::command]
-fn cancel(state: State<'_, AppState>) {
-    if let Some(capture) = &state.inner.lock().unwrap().capture {
+fn cancel(app: AppHandle) {
+    let state = app.state::<AppState>();
+    let mut inner = state.inner.lock().unwrap();
+    if !inner.status.phase.busy() {
+        return;
+    }
+    if let Some(capture) = &inner.capture {
         capture.cancelled.store(true, Ordering::Relaxed);
         capture.stop.store(true, Ordering::Relaxed);
     }
+    // Invalidate the running pipeline before releasing the lock. A late
+    // result must neither overwrite this state nor insert text.
+    inner.session = inner.session.wrapping_add(1);
+    inner.capture = None;
+    inner.status.recording_since = None;
+    inner.status.phase = Phase::Cancelled;
+    inner.status.inserted = false;
+    drop(inner);
+    set_tray_status(&app, Phase::Cancelled, false);
 }
 
 #[tauri::command]
@@ -694,7 +727,7 @@ fn tray(app: &AppHandle) -> tauri::Result<()> {
         .on_menu_event(|app, event| match event.id().as_ref() {
             "open" => show(app),
             "stop" => stop(app.state()),
-            "cancel" => cancel(app.state()),
+            "cancel" => cancel(app.clone()),
             "copy" => {
                 let handle = app.clone();
                 tauri::async_runtime::spawn(async move {
@@ -758,7 +791,8 @@ pub fn run() {
                     settings,
                     status,
                     capture: None,
-                    press: ShortcutPress::default(),
+                    press: HotkeyState::default(),
+                    session: 0,
                     shortcut_error: None,
                     shortcut_active: false,
                     started_from_hotkey: false,

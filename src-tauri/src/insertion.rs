@@ -116,17 +116,34 @@ fn direct_safe(text: &str) -> bool {
     !text.is_empty() && text.chars().count() <= 400 && !text.chars().any(char::is_control)
 }
 
+fn chunks(text: &str, size: usize) -> Vec<String> {
+    text.chars()
+        .collect::<Vec<_>>()
+        .chunks(size)
+        .map(|chunk| chunk.iter().collect())
+        .collect()
+}
+
 pub fn insert(target: Target, text: &str, cancelled: &AtomicBool) -> Result<(), &'static str> {
     if !direct_safe(text) {
         return Err("Copy long or multiline text manually.");
     }
     let mut input = Enigo::new(&Settings::default()).map_err(|_| "Could not open system input.")?;
-    if cancelled.load(Ordering::Relaxed) || focus(true) != Some(target) {
-        return Err("The target changed or a modifier is held. Copy the result manually.");
+    for chunk in chunks(text, 64) {
+        if cancelled.load(Ordering::Relaxed) {
+            return Err("Insertion was cancelled. The result is available to copy.");
+        }
+        if focus(true) != Some(target) {
+            return Err("The target changed or a modifier is held. Copy the result manually.");
+        }
+        input.text(&chunk).map_err(|_| {
+            "Text insertion could not be confirmed. The result is available to copy."
+        })?;
     }
-    input
-        .text(text)
-        .map_err(|_| "Text insertion could not be confirmed. The result is available to copy.")
+    if cancelled.load(Ordering::Relaxed) {
+        return Err("Insertion was cancelled. The result is available to copy.");
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -139,5 +156,14 @@ mod tests {
         assert!(!direct_safe("run\ncommand"));
         assert!(!direct_safe("a\tb"));
         assert!(!direct_safe(&"a".repeat(401)));
+    }
+
+    #[test]
+    fn chunking_preserves_unicode_without_splitting_a_scalar_value() {
+        let text = "Grüße 😀 aus München – ß, é, €.";
+        let parts = chunks(text, 4);
+        assert!(parts.len() > 1);
+        assert!(parts.iter().all(|part| part.chars().count() <= 4));
+        assert_eq!(parts.concat(), text);
     }
 }
