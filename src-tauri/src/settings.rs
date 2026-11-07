@@ -306,8 +306,10 @@ mod tests {
         assert!(!Settings::default().spoken_formatting);
         let settings: Settings = serde_json::from_str(r#"{"schema_version":3}"#).unwrap();
         assert!(!settings.spoken_formatting);
-        let mut enabled = Settings::default();
-        enabled.spoken_formatting = true;
+        let enabled = Settings {
+            spoken_formatting: true,
+            ..Default::default()
+        };
         let serialized = serde_json::to_string(&enabled).unwrap();
         let restored: Settings = serde_json::from_str(&serialized).unwrap();
         assert!(restored.spoken_formatting);
@@ -322,9 +324,11 @@ mod tests {
             serde_json::from_str(r#"{"schema_version":3,"shortcut":"Ctrl+Shift+Space"}"#).unwrap();
         assert!(!old.onboarding_complete);
         assert_eq!(old.onboarding_step, 0);
-        let mut saved = Settings::default();
-        saved.onboarding_step = 2;
-        saved.onboarding_complete = true;
+        let mut saved = Settings {
+            onboarding_step: 2,
+            onboarding_complete: true,
+            ..Default::default()
+        };
         let roundtrip: Settings =
             serde_json::from_str(&serde_json::to_string(&saved).unwrap()).unwrap();
         assert_eq!(roundtrip.onboarding_step, 2);
