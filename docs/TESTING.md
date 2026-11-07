@@ -31,15 +31,15 @@ künstliche Sprachaufnahmen erzeugen. Das Testprogramm erwartet
 Mono-WAV-Dateien mit 16 kHz und 16 Bit. Die Texte hier sind kurze Testsätze.
 
 ```sh
-export VOXTAKT_FIXTURES="$(mktemp -d)"
+export VOICEWRIGHT_FIXTURES="$(mktemp -d)"
 espeak-ng -v de --stdout 'Guten Morgen. Das ist ein Diktat auf Deutsch.' |
-  ffmpeg -loglevel error -i pipe:0 -ac 1 -ar 16000 -c:a pcm_s16le "$VOXTAKT_FIXTURES/de.wav"
+  ffmpeg -loglevel error -i pipe:0 -ac 1 -ar 16000 -c:a pcm_s16le "$VOICEWRIGHT_FIXTURES/de.wav"
 espeak-ng -v en-us --stdout 'Good morning. This is a dictation test in English.' |
-  ffmpeg -loglevel error -i pipe:0 -ac 1 -ar 16000 -c:a pcm_s16le "$VOXTAKT_FIXTURES/en.wav"
+  ffmpeg -loglevel error -i pipe:0 -ac 1 -ar 16000 -c:a pcm_s16le "$VOICEWRIGHT_FIXTURES/en.wav"
 
-VOXTAKT_WHISPER_MODEL=/absoluter/pfad/ggml-base.bin \
+VOICEWRIGHT_WHISPER_MODEL=/absoluter/pfad/ggml-base.bin \
   cargo test --manifest-path src-tauri/Cargo.toml --locked --test speech -- --ignored
-VOXTAKT_TEST_GGUF=/absoluter/pfad/Qwen3-0.6B-Q8_0.gguf \
+VOICEWRIGHT_TEST_GGUF=/absoluter/pfad/Qwen3-0.6B-Q8_0.gguf \
   cargo test --manifest-path engines/cleanup/Cargo.toml --locked --test protocol -- --ignored
 ```
 
@@ -85,7 +85,7 @@ mit Originaltext.
 Erzeuge aus `de.wav` aus dem Modelltest eine Rohdatei:
 
 ```sh
-ffmpeg -i "$VOXTAKT_FIXTURES/de.wav" -ar 48000 -ac 2 -f s16le "$VOXTAKT_FIXTURES/de.raw"
+ffmpeg -i "$VOICEWRIGHT_FIXTURES/de.wav" -ar 48000 -ac 2 -f s16le "$VOICEWRIGHT_FIXTURES/de.raw"
 ```
 
 Verwende einen unprivilegierten Linux-Container ohne Netzwerk. Er benötigt
@@ -94,9 +94,9 @@ die Linux-Systembibliotheken aus [INSTALLATION.md](INSTALLATION.md) sowie
 `pulseaudio-utils`, `libasound2-plugins` und `python3`. Rufe darin auf:
 
 ```sh
-dbus-run-session -- bash scripts/linux-smoke/run.sh /pfad/VoxTakt.deb \
+dbus-run-session -- bash scripts/linux-smoke/run.sh /pfad/Voicewright.deb \
   /pfad/ggml-base.bin /pfad/de.raw
-dbus-run-session -- bash scripts/linux-smoke/run.sh /pfad/VoxTakt.deb \
+dbus-run-session -- bash scripts/linux-smoke/run.sh /pfad/Voicewright.deb \
   /pfad/ggml-base.bin /pfad/de.raw /pfad/Qwen3-0.6B-Q8_0.gguf
 ```
 

@@ -11,5 +11,5 @@ execFileSync(cargo, ['build', '--locked', '--release', '--manifest-path', 'engin
   '--target-dir', targetDir, '--target', target], { stdio: 'inherit' });
 const suffix = target.includes('windows') ? '.exe' : '';
 mkdirSync('src-tauri/binaries', { recursive: true });
-copyFileSync(resolve(targetDir, target, 'release', 'voxtakt-cleanup' + suffix),
-  'src-tauri/binaries/voxtakt-cleanup-' + target + suffix);
+copyFileSync(resolve(targetDir, target, 'release', 'voicewright-cleanup' + suffix),
+  'src-tauri/binaries/voicewright-cleanup-' + target + suffix);

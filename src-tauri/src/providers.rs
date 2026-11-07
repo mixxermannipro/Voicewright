@@ -5,7 +5,8 @@ use serde_json::{json, Value};
 use std::net::SocketAddr;
 use std::time::Duration;
 
-const KEYRING_SERVICE: &str = "de.voxtakt.desktop";
+const KEYRING_SERVICE: &str = "de.voicewright.desktop";
+const LEGACY_KEYRING_SERVICE: &str = "de.voxtakt.desktop";
 const KEYRING_ERROR: &str = "Der Passwortspeicher des Systems ist nicht verfügbar oder gesperrt.";
 const MISSING_KEY: &str = "Speichere zuerst einen API-Schlüssel für diesen Anbieter.";
 const OUTPUT_LIMIT: u32 = 4096;
@@ -147,9 +148,17 @@ fn endpoint_url(base: &Url, path: &str) -> Result<Url, String> {
         .map_err(|_| "Die Serveradresse ist ungültig.".into())
 }
 
-fn entry(config: &ProviderConfig) -> Result<keyring::Entry, String> {
+fn entry_for(service: &str, config: &ProviderConfig) -> Result<keyring::Entry, String> {
     let scope = config.credential_scope()?;
-    keyring::Entry::new(KEYRING_SERVICE, &scope).map_err(|_| KEYRING_ERROR.into())
+    keyring::Entry::new(service, &scope).map_err(|_| KEYRING_ERROR.into())
+}
+
+fn entry(config: &ProviderConfig) -> Result<keyring::Entry, String> {
+    entry_for(KEYRING_SERVICE, config)
+}
+
+fn legacy_entry(config: &ProviderConfig) -> Result<keyring::Entry, String> {
+    entry_for(LEGACY_KEYRING_SERVICE, config)
 }
 
 pub fn set_key(config: &ProviderConfig, key: &str) -> Result<(), String> {
@@ -163,9 +172,13 @@ pub fn set_key(config: &ProviderConfig, key: &str) -> Result<(), String> {
 }
 
 pub fn delete_key(config: &ProviderConfig) -> Result<(), String> {
-    match entry(config)?.delete_credential() {
-        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-        Err(_) => Err(KEYRING_ERROR.into()),
+    let current = entry(config)?.delete_credential();
+    let legacy = legacy_entry(config)?.delete_credential();
+    match (current, legacy) {
+        (Ok(()), _)
+        | (Err(keyring::Error::NoEntry), Ok(()))
+        | (Err(keyring::Error::NoEntry), Err(keyring::Error::NoEntry)) => Ok(()),
+        _ => Err(KEYRING_ERROR.into()),
     }
 }
 
@@ -176,7 +189,11 @@ pub fn has_key(config: &ProviderConfig) -> Result<bool, String> {
 fn read_key(config: &ProviderConfig) -> Result<Option<String>, String> {
     match entry(config)?.get_password() {
         Ok(key) => Ok(Some(key)),
-        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(keyring::Error::NoEntry) => match legacy_entry(config)?.get_password() {
+            Ok(key) => Ok(Some(key)),
+            Err(keyring::Error::NoEntry) => Ok(None),
+            Err(_) => Err(KEYRING_ERROR.into()),
+        },
         Err(_) => Err(KEYRING_ERROR.into()),
     }
 }

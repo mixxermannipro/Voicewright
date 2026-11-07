@@ -16,8 +16,8 @@ export HOME="$work/home" XDG_DATA_HOME="$work/data" XDG_RUNTIME_DIR="$work/runti
 export XDG_SESSION_TYPE=x11 ALSA_CONFIG_PATH="$work/alsa.conf"
 unset WAYLAND_DISPLAY
 mkdir -m 700 "$HOME" "$XDG_RUNTIME_DIR"
-mkdir -p "$XDG_DATA_HOME/de.voxtakt.desktop/models" "$XDG_CACHE_HOME" "$work/package"
-app_data="$XDG_DATA_HOME/de.voxtakt.desktop"
+mkdir -p "$XDG_DATA_HOME/de.voicewright.desktop/models" "$XDG_CACHE_HOME" "$work/package"
+app_data="$XDG_DATA_HOME/de.voicewright.desktop"
 trap 'kill "${app:-}" "${target:-}" "${xvfb:-}" 2>/dev/null || true; pulseaudio --kill 2>/dev/null || true; rm -rf -- "$work"' EXIT
 cp "$whisper_model" "$app_data/models/ggml-base.bin"
 if [[ -n "$cleanup_model" ]]; then
@@ -25,7 +25,7 @@ if [[ -n "$cleanup_model" ]]; then
   printf '%s\n' '{"speech_language":"de","cleanup_mode":"local","fallback":false,"recording_mode":"toggle","translation":"English"}' >"$app_data/settings.json"
 fi
 dpkg-deb -x "$package" "$work/package"
-test -x "$work/package/usr/bin/voxtakt-cleanup"
+test -x "$work/package/usr/bin/voicewright-cleanup"
 cc "$fixture_dir/probe.c" $(pkg-config --cflags --libs gtk+-3.0) -o "$work/probe"
 cat >"$ALSA_CONFIG_PATH" <<'ALSA'
 pcm.!default {
@@ -42,13 +42,13 @@ export DISPLAY=":$(cat "$work/display")"
 export WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1
 pulseaudio -n --daemonize=true --exit-idle-time=-1 \
   --load=module-native-protocol-unix \
-  --load="module-pipe-source source_name=voxtakt file=$work/voice.pcm format=s16le rate=48000 channels=2"
-pactl set-default-source voxtakt
+  --load="module-pipe-source source_name=voicewright file=$work/voice.pcm format=s16le rate=48000 channels=2"
+pactl set-default-source voicewright
 
 start=$(date +%s%N)
-"$work/package/usr/bin/voxtakt" >"$work/app.log" 2>&1 &
+"$work/package/usr/bin/voicewright" >"$work/app.log" 2>&1 &
 app=$!
-if ! timeout 30 xdotool search --sync --onlyvisible --name '^VoxTakt$' >/dev/null; then
+if ! timeout 30 xdotool search --sync --onlyvisible --name '^Voicewright$' >/dev/null; then
   cat "$work/app.log" >&2
   exit 1
 fi

@@ -2,7 +2,7 @@
 
 Die Tabelle nennt die vorgesehenen Pakete. Ob sie aktuell gebaut und
 veröffentlicht wurden, steht in [PROGRESS.md](PROGRESS.md) und auf
-[GitHub Releases](https://github.com/mixxermannipro/speechy/releases).
+[GitHub Releases](https://github.com/mixxermannipro/Voicewright/releases).
 
 | System | Paket | Wichtige Prüfungen |
 | --- | --- | --- |
@@ -12,9 +12,9 @@ veröffentlicht wurden, steht in [PROGRESS.md](PROGRESS.md) und auf
 | Linux x64 mit Wayland | Dieselben Linux-Pakete | Diktat über die App. Kopiere das Ergebnis manuell. Globale Kürzel und direkte Texteingabe sind in dieser Sitzung deaktiviert. |
 | macOS mit Intel | Kein Paket im aktuellen Ablauf | Eigenen Build und praktische Prüfung nachholen |
 
-Für die direkte Texteingabe unter Windows und X11 prüft VoxTakt
+Für die direkte Texteingabe unter Windows und X11 prüft Voicewright
 vor dem Tippen den Fokus. Bei Fokuswechsel, Steuerzeichen oder mehrzeiligem
-Text bleibt das Ergebnis zum Kopieren in der App. VoxTakt verwendet für die
+Text bleibt das Ergebnis zum Kopieren in der App. Voicewright verwendet für die
 direkte Eingabe keinen automatischen Zugriff auf die Zwischenablage.
 
 Eine erfolgreiche Paketerstellung prüft keine Geräte und keine

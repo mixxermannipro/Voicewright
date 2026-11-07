@@ -7,6 +7,7 @@ use crate::{
 };
 use serde::Serialize;
 use std::{
+    fs,
     path::{Path, PathBuf},
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -28,6 +29,23 @@ struct AppState {
     tray_available: AtomicBool,
     clipboard: Mutex<Option<arboard::Clipboard>>,
     inner: Mutex<Inner>,
+}
+
+const LEGACY_APP_IDENTIFIER: &str = "de.voxtakt.desktop";
+
+fn migrate_legacy_data(root: &Path) {
+    if root.exists() {
+        return;
+    }
+    let Some(parent) = root.parent() else {
+        return;
+    };
+    let legacy = parent.join(LEGACY_APP_IDENTIFIER);
+    if !legacy.is_dir() {
+        return;
+    }
+    let _ = fs::create_dir_all(parent);
+    let _ = fs::rename(legacy, root);
 }
 
 struct Inner {
@@ -275,12 +293,12 @@ fn set_tray_status(app: &AppHandle, phase: Phase, has_warning: bool) {
         return;
     };
     let text = match phase {
-        Phase::Recording => "VoxTakt · ● Aufnahme / Recording",
-        Phase::Transcribing => "VoxTakt · Spracherkennung / Transcribing",
-        Phase::Cleaning => "VoxTakt · Textkorrektur / Editing",
-        Phase::Failed => "VoxTakt · Fehler / Error",
-        Phase::Completed if has_warning => "VoxTakt · Text zum Kopieren / Text ready to copy",
-        _ => "VoxTakt",
+        Phase::Recording => "Voicewright · ● Aufnahme / Recording",
+        Phase::Transcribing => "Voicewright · Spracherkennung / Transcribing",
+        Phase::Cleaning => "Voicewright · Textkorrektur / Editing",
+        Phase::Failed => "Voicewright · Fehler / Error",
+        Phase::Completed if has_warning => "Voicewright · Text zum Kopieren / Text ready to copy",
+        _ => "Voicewright",
     };
     let _ = tray.set_tooltip(Some(text));
     let image = if phase == Phase::Recording {
@@ -390,7 +408,7 @@ async fn pipeline(
     } else if from_hotkey {
         append_warning(
             &mut warning,
-            "The result is available to copy in VoxTakt.".into(),
+            "The result is available to copy in Voicewright.".into(),
         );
     }
     state.inner.lock().unwrap().status.warning = warning;
@@ -658,7 +676,7 @@ fn show(app: &AppHandle) {
 }
 
 fn tray(app: &AppHandle) -> tauri::Result<()> {
-    let open = MenuItem::with_id(app, "open", "VoxTakt öffnen / Open", true, None::<&str>)?;
+    let open = MenuItem::with_id(app, "open", "Voicewright öffnen / Open", true, None::<&str>)?;
     let stop_item = MenuItem::with_id(app, "stop", "Aufnahme beenden / Stop", true, None::<&str>)?;
     let cancel_item = MenuItem::with_id(
         app,
@@ -672,7 +690,7 @@ fn tray(app: &AppHandle) -> tauri::Result<()> {
     let menu = Menu::with_items(app, &[&open, &stop_item, &cancel_item, &copy, &quit])?;
     let mut tray = TrayIconBuilder::with_id("main")
         .menu(&menu)
-        .tooltip("VoxTakt")
+        .tooltip("Voicewright")
         .on_menu_event(|app, event| match event.id().as_ref() {
             "open" => show(app),
             "stop" => stop(app.state()),
@@ -716,6 +734,7 @@ pub fn run() {
     builder
         .setup(|app| {
             let root = app.path().app_data_dir()?;
+            migrate_legacy_data(&root);
             let mut status = Status::default();
             let settings = settings::load(&root.join("settings.json")).unwrap_or_else(|error| {
                 status.warning = Some(error);
@@ -786,5 +805,35 @@ pub fn run() {
             provider_test
         ])
         .run(tauri::generate_context!())
-        .expect("VoxTakt desktop runtime failed");
+        .expect("Voicewright desktop runtime failed");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const APP_IDENTIFIER: &str = "de.voicewright.desktop";
+
+    #[test]
+    fn moves_legacy_app_data_only_when_the_new_directory_is_absent() {
+        let directory = tempfile::tempdir().unwrap();
+        let root = directory.path().join(APP_IDENTIFIER);
+        let legacy = directory.path().join(LEGACY_APP_IDENTIFIER);
+        fs::create_dir_all(&legacy).unwrap();
+        fs::write(legacy.join("settings.json"), b"{}").unwrap();
+
+        migrate_legacy_data(&root);
+        assert!(root.join("settings.json").is_file());
+        assert!(!legacy.exists());
+
+        fs::write(root.join("settings.json"), b"{\"current\":true}").unwrap();
+        fs::create_dir_all(&legacy).unwrap();
+        fs::write(legacy.join("settings.json"), b"{\"legacy\":true}").unwrap();
+        migrate_legacy_data(&root);
+        assert_eq!(
+            fs::read_to_string(root.join("settings.json")).unwrap(),
+            "{\"current\":true}"
+        );
+        assert!(legacy.exists());
+    }
 }

@@ -2,7 +2,7 @@
 
 Die Spracherkennung nutzt **Whisper** in einem Format für
 [whisper.cpp](https://github.com/ggml-org/whisper.cpp). Für lokale
-Textkorrektur verwendet VoxTakt **GGUF** mit
+Textkorrektur verwendet Voicewright **GGUF** mit
 [llama.cpp](https://github.com/ggml-org/llama.cpp). Die Dateiformate sind
 verschieden. Die lokale Korrektur erwartet eine einzelne Qwen3-GGUF-Datei
 mit höchstens 2 GiB. Eine passende Dateiendung allein reicht für die
