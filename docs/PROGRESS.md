@@ -60,6 +60,27 @@ ausgeführt; echte DE/EN-Audiotests, npm/Cargo und Plattformprüfungen
 stehen weiterhin aus. Issue #34 bleibt für reale Abnahme und
 fortgeschrittene Zahlen-/Datumsformatierung offen.
 
+## Ersteinrichtung (Issue #22)
+
+Ein neuer, optional erneut aufrufbarer vierstufiger Assistent integriert
+den vorhandenen Modell-Download, die Mikrofonaufnahme und die
+Tastenkürzel-/Kopierwege. Jeder Schritt wird im lokalen
+`Settings`-Objekt gespeichert. Der Fortschritt lässt sich nach
+Neustart fortsetzen; nach Abschluss ist die Führung ausgeblendet.
+Alte Settings bleiben kompatibel und auf einem neuen Gerät importierte
+Settings setzen die Ersteinrichtung zurück.
+
+Die Funktion **startet weder automatisch Downloads noch
+Cloud-Requests**. Der angeleitete Mikrofontest ist bei aktivierter
+Cloud-Korrektur gesperrt. Deutsche und englische Hinweise zu
+Berechtigungen, Tray und fehlender globaler Einfügung stehen in
+[ONBOARDING.md](ONBOARDING.md).
+
+**Teststatus:** UI-/Rust-Tests sind erstellt, aber nicht ausgeführt;
+reale Windows/macOS/Linux-Installationen, echte Mikrofonrechte,
+Downloads, globales Einfügen und Screenreader bleiben zu prüfen.
+Issue #22 bleibt bis zur plattformspezifischen Abnahme offen.
+
 ## Was vorhanden ist
 
 - Deutsch-englische Tauri-Oberfläche mit Übersicht, Kurzanleitung, Mikrofonwahl, konfigurierbarem Tastenkürzel, Halten und Umschalten, Aufnahmepegel, Abbruch, Statussymbol und Kopiermöglichkeit. Einstellungen bleiben nach Neustart erhalten. Die App speichert keinen Diktatverlauf.
