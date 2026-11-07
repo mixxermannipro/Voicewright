@@ -112,6 +112,10 @@ pub fn import(bytes: &[u8]) -> Result<Settings, String> {
     // A microphone ID is specific to the originating machine.
     settings.cleanup_mode = CleanupMode::Off;
     settings.microphone = None;
+    // An imported backup describes a different device: microphone access,
+    // available model files and shortcuts need a fresh guided check.
+    settings.onboarding_step = 0;
+    settings.onboarding_complete = false;
     settings.validate()?;
     Ok(settings)
 }
@@ -161,6 +165,8 @@ mod tests {
         settings.prompt = "Private Begriffe Ä, Ü, ß".into();
         settings.vocabulary = "Oachkatzlschwoaf".into();
         settings.microphone = Some("specific-device-123".into());
+        settings.onboarding_step = 3;
+        settings.onboarding_complete = true;
         export(&path, &settings).unwrap();
         let raw = fs::read(&path).unwrap();
         let imported = import(&raw).unwrap();
@@ -168,6 +174,8 @@ mod tests {
         assert_eq!(imported.vocabulary, settings.vocabulary);
         assert!(imported.microphone.is_none());
         assert_eq!(imported.cleanup_mode, CleanupMode::Off);
+        assert!(!imported.onboarding_complete);
+        assert_eq!(imported.onboarding_step, 0);
         let json = String::from_utf8(raw).unwrap();
         assert!(!json.contains("api_key"));
         assert!(!json.contains("transcript"));
