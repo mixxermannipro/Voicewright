@@ -225,7 +225,7 @@ mod tests {
         );
         assert_eq!(
             format("Code literalmodus an neue Zeile komma literalmodus aus Punkt", true),
-            "Code neue Zeile komma ."
+            "Code neue Zeile komma."
         );
         assert_eq!(
             format("Er sagt anführungszeichen auf neue Zeile komma anführungszeichen zu punkt", true),
