@@ -64,3 +64,24 @@ export type Status = {
 
 export const inProgress = (status: Status | undefined) => status
   ? ['recording', 'transcribing', 'cleaning', 'inserting'].includes(status.phase) : false;
+
+
+/** Deterministic onboarding gates: a user may inspect earlier steps, but
+ * cannot mark model setup or microphone verification as completed without
+ * the corresponding local observable state. External-app success requires
+ * a separate explicit user acknowledgement.
+ */
+export function canAdvanceSetup(
+  step: number,
+  modelReady: boolean,
+  status: Pick<Status, 'phase' | 'transcript'> | undefined,
+  acknowledgedExternal = false,
+): boolean {
+  switch (step) {
+    case 0: return true;
+    case 1: return modelReady;
+    case 2: return status?.phase === 'completed' && Boolean(status.transcript?.trim());
+    case 3: return acknowledgedExternal;
+    default: return false;
+  }
+}
