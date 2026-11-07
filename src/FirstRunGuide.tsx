@@ -43,7 +43,7 @@ export function FirstRunGuide({
     t('Tastenkürzel', 'Shortcut'),
   ];
   const blocked = !canSaveProgress || saving || dictating;
-  const mayAdvance = canAdvanceSetup(step, ready, status, confirmedExternal);
+  const mayAdvance = canAdvanceSetup(step, ready, status, confirmedExternal, settings.cleanup_mode === 'cloud');
   const next = (newStep: number, complete = false) => { void onProgress(newStep, complete); };
 
   return <section className="panel first-run-guide" aria-label={t('Ersteinrichtung', 'First-run setup')}>
