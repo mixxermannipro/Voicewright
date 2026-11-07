@@ -25,3 +25,30 @@ angemeldeten Betriebssystemkontos. API-Schlüssel gehören in dessen
 Zugangsdaten-Speicher. Ein über die Oberfläche kopierter Text landet in der
 System-Zwischenablage. Je nach Betriebssystem können Zwischenablage-Verlauf
 und geräteübergreifende Synchronisierung den kopierten Text übernehmen.
+
+## Wichtige Grenzen und Benutzerkontrolle
+
+- **Lokale Diktate:** Für reine Audioerkennung und lokale Textkorrektur ist
+  kein Cloud-Korrekturanbieter nötig. Der bewusste Modelldownload benötigt
+  allerdings Internet, sofern Modelle nicht importiert werden.
+- **Cloud-Opt-in:** Bei aktivierter externer Textkorrektur gelangen Transkript
+  und Bearbeitungsanweisung (einschließlich eventueller Wörterlisten und
+  Übersetzungsziele) an den gewählten Anbieter. Dort können Speicherung,
+  Verarbeitung, Abrechnung und eigene Datenschutzbedingungen gelten.
+  Keine privaten Inhalte zu Testzwecken in externe Provider senden.
+- **Einstellungen und Ergebnisse:** Die App speichert Modelle und Konfiguration
+  im Benutzerprofil, jedoch keinen dauerhaften Diktatverlauf. Das letzte
+  Ergebnis bleibt während der App-Sitzung abrufbar, bis es gelöscht oder
+  ersetzt wird. „Letztes Ergebnis leeren“ ist **keine** Löschung aus der
+  Zwischenablage, fremden Textfeldern oder dem Verlauf anderer Programme.
+- **Eigene Server:** Ein selbst eingetragener kompatibler Endpoint ist eine
+  Vertrauensentscheidung. Auch HTTPS garantiert nicht, dass der Betreiber
+  vertrauenswürdig ist. Lokale LLM-Server können unabhängig von Voicewright
+  weitere Netzwerkanfragen ausführen.
+- **API-Schlüssel:** Voicewright legt Schlüssel im OS-Zugangsdaten-Speicher
+  statt in den normalen JSON-Einstellungen ab. Das löscht weder mögliche
+  Protokolle beim Provider noch Kopien im OS-Backup.
+- **Kein Sicherheitsversprechen:** Details über Grenzen, bekannte Risiken
+  und noch ungetestete Szenarien beschreibt das
+  [Bedrohungsmodell](docs/THREAT_MODEL.md). Eine Releasefreigabe folgt daraus
+  nicht automatisch.
