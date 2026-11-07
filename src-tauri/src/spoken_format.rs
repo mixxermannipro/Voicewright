@@ -88,7 +88,9 @@ pub fn format(text: &str, enabled: bool) -> String {
     let mut result = String::with_capacity(text.len());
     let mut pos = 0;
     let mut in_code = false;
-    let mut in_quote = false;
+    // Track the expected closing character so nested quotes do not expose
+    // text to command replacement.
+    let mut in_quote: Option<char> = None;
     let mut in_spoken_quote = false;
     let mut in_literal = false;
 
@@ -98,7 +100,7 @@ pub fn format(text: &str, enabled: bool) -> String {
         let next = text[pos + current.len_utf8()..].chars().next();
 
         // Inline code and fenced Markdown use backtick parity. Both are literal.
-        if current == '`' && !in_quote && !in_spoken_quote && !in_literal {
+        if current == '`' && in_quote.is_none() && !in_spoken_quote && !in_literal {
             in_code = !in_code;
             result.push(current);
             pos += current.len_utf8();
@@ -109,13 +111,23 @@ pub fn format(text: &str, enabled: bool) -> String {
         let quote_delimiter = matches!(current, '"' | '„' | '“' | '”')
             || (current == '\'' && !(prev.is_some_and(word) && next.is_some_and(word)));
         if quote_delimiter && !in_code && !in_spoken_quote && !in_literal {
-            in_quote = !in_quote;
+            match in_quote {
+                Some(closer) if current == closer => in_quote = None,
+                None => {
+                    in_quote = Some(match current {
+                        '„' => '“',
+                        '“' => '”',
+                        other => other,
+                    });
+                }
+                _ => {}
+            }
             result.push(current);
             pos += current.len_utf8();
             continue;
         }
 
-        if !in_code && !in_quote {
+        if !in_code && in_quote.is_none() {
             if let Some((end, command)) = rule_at(text, pos) {
                 if in_literal {
                     if command == Command::LiteralOff {
@@ -222,6 +234,10 @@ mod tests {
         assert_eq!(
             format("Zitat „neuer Absatz“ neue Zeile Text", true),
             "Zitat „neuer Absatz“\nText"
+        );
+        assert_eq!(
+            format("Zitat \"'neue Zeile' und Punkt\" komma Ende", true),
+            "Zitat \"'neue Zeile' und Punkt\", Ende"
         );
         assert_eq!(
             format("Code literalmodus an neue Zeile komma literalmodus aus Punkt", true),
