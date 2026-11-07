@@ -28,6 +28,21 @@ Modell-Evaluation in Windows/macOS/Linux. Die Golden-Fälle in
 bestandener Qualitätsnachweis. Der Validator erkennt keine subtilen
 Bedeutungsänderungen oder Halluzinationen.
 
+## Sichere Einstellungsverwaltung (Issue #26)
+
+Ein neuer Branch ergänzt Schema-Versionierung, Migration alter Alpha-Settings,
+atomare Datenspeicherung mit Backup unlesbarer Konfiguration, lokalen
+JSON-Export ohne API-Schlüssel, Import mit Vorschau, Zurücksetzen als
+Entwurf und sicheres Abschalten des Cloud-Modus bei Import.
+Die [Anleitung](SETTINGS_BACKUP.md) beschreibt die Datenarten,
+Rollback-Möglichkeit und bewusst nicht implementierte vollständige
+Löschung persönlicher Modell-/Keyringdaten.
+
+**Teststatus:** Rust/npm, Dateidialoge und reale Plattform-Tests sind
+vereinbarungsgemäß für die spätere Abnahme ausstehend. Ein gemergter
+Code-PR bedeutet noch keine bestätigte Funktionsfähigkeit. Issue #26
+bleibt für vollständige Löschroutine und Tests offen.
+
 ## Was vorhanden ist
 
 - Deutsch-englische Tauri-Oberfläche mit Übersicht, Kurzanleitung, Mikrofonwahl, konfigurierbarem Tastenkürzel, Halten und Umschalten, Aufnahmepegel, Abbruch, Statussymbol und Kopiermöglichkeit. Einstellungen bleiben nach Neustart erhalten. Die App speichert keinen Diktatverlauf.
