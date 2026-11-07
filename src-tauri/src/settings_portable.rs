@@ -123,7 +123,7 @@ mod tests {
 
     #[test]
     fn legacy_alpha_and_two_older_migrations_are_idempotent() {
-        let legacy = br#"{"prompt":"Eigene Anweisung","vocabulary":"Grüße München","shortcut":"Ctrl+Shift+Space"}"#;
+        let legacy = r#"{"prompt":"Eigene Anweisung","vocabulary":"Grüße München","shortcut":"Ctrl+Shift+Space"}"#.as_bytes();
         let a = decode(legacy).unwrap();
         assert_eq!(a.schema_version, SETTINGS_SCHEMA_VERSION);
         assert_eq!(a.prompt, "Eigene Anweisung");
