@@ -200,6 +200,13 @@ pub fn save(path: &Path, settings: &Settings) -> Result<(), String> {
     // without safely preserving its exact bytes first.
     match fs::read(path) {
         Ok(bytes) if settings_portable::decode(&bytes).is_err() => {
+            // Do not downgrade an unknown future format, even with a backup.
+            if let Ok(value) = serde_json::from_slice::<serde_json::Value>(&bytes) {
+                if value.get("schema_version").and_then(serde_json::Value::as_u64)
+                    .is_some_and(|version| version > u64::from(SETTINGS_SCHEMA_VERSION)) {
+                    return Err("A newer Voicewright version created this settings file; it was not overwritten.".into());
+                }
+            }
             settings_portable::back_up_invalid(path, &bytes)?;
         }
         Ok(_) => {}
@@ -254,6 +261,16 @@ mod tests {
         );
         save(&path, &Settings::default()).unwrap();
         assert_eq!(load(&path).unwrap().schema_version, SETTINGS_SCHEMA_VERSION);
+    }
+
+    #[test]
+    fn never_overwrites_a_future_settings_schema() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        let future = br#"{"schema_version":999,"prompt":"future prompt"}"#;
+        fs::write(&path, future).unwrap();
+        assert!(save(&path, &Settings::default()).is_err());
+        assert_eq!(fs::read(&path).unwrap(), future);
     }
 
     #[test]
