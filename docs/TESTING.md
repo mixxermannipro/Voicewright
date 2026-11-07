@@ -20,6 +20,17 @@ npm audit --audit-level=high
 Der GitHub-Ablauf prüft zusätzlich beide Rust-Abhängigkeitslisten mit
 `cargo audit`. Dafür wird `cargo-audit` aus RustSec benötigt.
 
+## Sicherheitsprüfungen vor Release
+
+Das [Bedrohungsmodell](THREAT_MODEL.md) definiert die Szenarien S01–S10:
+Netzwerk-Opt-in, Provider-Ziele, Test-Secrets, manipulierte Modelle,
+Fokus-/Passwortfelder, Unicode, KI-Injection, Berechtigungen,
+Sidecar-Lifecycle und signierte Installer. Diese Prüfungen werden **nicht**
+durch einen bestandenen Build oder Unit-Test ersetzt. Dokumentiere für
+jede Zielplattform Datum, Version, Hardware und tatsächliches Ergebnis.
+Teste nur mit künstlichen Diktaten, Test-API-Schlüsseln und isolierten
+Dateien, niemals mit echten personenbezogenen Daten oder produktiven Keys.
+
 ## Modelltests mit echten Gewichten
 
 Diese Tests laufen getrennt von den Standardprüfungen. Verwende das
