@@ -20,8 +20,8 @@ pub fn decode(bytes: &[u8]) -> Result<Settings, String> {
     if bytes.len() > MAX_SETTINGS_BYTES {
         return Err("The settings file is larger than 256 KiB.".into());
     }
-    let mut value: Value = serde_json::from_slice(bytes)
-        .map_err(|_| "The settings file is not valid JSON.")?;
+    let mut value: Value =
+        serde_json::from_slice(bytes).map_err(|_| "The settings file is not valid JSON.")?;
     let version = match value.get("schema_version") {
         Some(version) => version.as_u64().ok_or("Invalid settings schema version.")?,
         None => 1,
@@ -42,8 +42,8 @@ pub fn decode(bytes: &[u8]) -> Result<Settings, String> {
         rename_field(&mut value, "insert_automatically", "auto_insert");
     }
     value["schema_version"] = json!(SETTINGS_SCHEMA_VERSION);
-    let settings: Settings = serde_json::from_value(value)
-        .map_err(|_| "The settings file has invalid field types.")?;
+    let settings: Settings =
+        serde_json::from_value(value).map_err(|_| "The settings file has invalid field types.")?;
     settings.validate()?;
     Ok(settings)
 }
@@ -81,13 +81,15 @@ pub fn export(path: &Path, settings: &Settings) -> Result<(), String> {
         "schema_version": SETTINGS_SCHEMA_VERSION,
         "settings": settings,
     });
-    let mut temp = tempfile::NamedTempFile::new_in(parent)
-        .map_err(|_| "Could not create settings export.")?;
+    let mut temp =
+        tempfile::NamedTempFile::new_in(parent).map_err(|_| "Could not create settings export.")?;
     serde_json::to_writer_pretty(&mut temp, &data)
         .map_err(|_| "Could not encode settings export.")?;
-    temp.flush().and_then(|_| temp.as_file().sync_all())
+    temp.flush()
+        .and_then(|_| temp.as_file().sync_all())
         .map_err(|_| "Could not save settings export.")?;
-    temp.persist(path).map_err(|_| "Could not write settings export.")?;
+    temp.persist(path)
+        .map_err(|_| "Could not write settings export.")?;
     Ok(())
 }
 
@@ -95,17 +97,21 @@ pub fn import(bytes: &[u8]) -> Result<Settings, String> {
     if bytes.len() > MAX_SETTINGS_BYTES {
         return Err("Settings import exceeds 256 KiB.".into());
     }
-    let document: Value = serde_json::from_slice(bytes)
-        .map_err(|_| "Invalid settings backup JSON.")?;
+    let document: Value =
+        serde_json::from_slice(bytes).map_err(|_| "Invalid settings backup JSON.")?;
     if document.get("format").and_then(Value::as_str) != Some(PORTABLE_FORMAT) {
         return Err("This file is not a Voicewright settings export.".into());
     }
-    let version = document.get("schema_version").and_then(Value::as_u64)
+    let version = document
+        .get("schema_version")
+        .and_then(Value::as_u64)
         .ok_or("Missing settings export schema version.")?;
     if version != u64::from(SETTINGS_SCHEMA_VERSION) {
         return Err("Unsupported settings export version.".into());
     }
-    let raw = document.get("settings").ok_or("The export has no settings.")?;
+    let raw = document
+        .get("settings")
+        .ok_or("The export has no settings.")?;
     let bytes = serde_json::to_vec(raw).map_err(|_| "Invalid exported settings.")?;
     let mut settings = decode(&bytes)?;
     // New devices must not silently send dictated text to cloud services.
@@ -136,7 +142,8 @@ mod tests {
         let b = decode(v1).unwrap();
         assert_eq!(b.shortcut, "Ctrl+Alt+F9");
         assert!(!b.auto_insert);
-        let v2 = br#"{"schema_version":2,"shortcut":"Ctrl+Shift+Space","insert_automatically":false}"#;
+        let v2 =
+            br#"{"schema_version":2,"shortcut":"Ctrl+Shift+Space","insert_automatically":false}"#;
         assert!(!decode(v2).unwrap().auto_insert);
         let serialized = serde_json::to_vec(&b).unwrap();
         assert_eq!(decode(&serialized).unwrap().shortcut, b.shortcut);
@@ -152,9 +159,15 @@ mod tests {
         assert!(decode(&data).is_err());
         back_up_invalid(&path, &data).unwrap();
         assert_eq!(fs::read(&path).unwrap(), b"{broken");
-        assert_eq!(fs::read(path.with_extension("invalid-01.bak")).unwrap(), b"{broken");
+        assert_eq!(
+            fs::read(path.with_extension("invalid-01.bak")).unwrap(),
+            b"{broken"
+        );
         back_up_invalid(&path, &data).unwrap();
-        assert_eq!(fs::read(path.with_extension("invalid-02.bak")).unwrap(), b"{broken");
+        assert_eq!(
+            fs::read(path.with_extension("invalid-02.bak")).unwrap(),
+            b"{broken"
+        );
     }
 
     #[test]
@@ -181,11 +194,14 @@ mod tests {
         assert!(!json.contains("transcript"));
 
         let mut cloud = Settings::default();
-        cloud.providers.insert("open_ai".into(), crate::providers::ProviderConfig {
-            provider: crate::providers::Provider::OpenAi,
-            endpoint: None,
-            model: "test-model".into(),
-        });
+        cloud.providers.insert(
+            "open_ai".into(),
+            crate::providers::ProviderConfig {
+                provider: crate::providers::Provider::OpenAi,
+                endpoint: None,
+                model: "test-model".into(),
+            },
+        );
         cloud.cleanup_mode = CleanupMode::Cloud;
         export(&path, &cloud).unwrap();
         let imported_cloud = import(&fs::read(&path).unwrap()).unwrap();

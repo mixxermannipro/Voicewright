@@ -200,11 +200,17 @@ mod tests {
     #[test]
     fn german_punctuation_and_paragraphs() {
         assert_eq!(
-            format("Hallo komma Welt ausrufezeichen neuer Absatz München punkt", true),
+            format(
+                "Hallo komma Welt ausrufezeichen neuer Absatz München punkt",
+                true
+            ),
             "Hallo, Welt!\n\nMünchen."
         );
         assert_eq!(
-            format("Betrag 50 Euro doppelpunkt neue Zeile 12.04.2026 fragezeichen", true),
+            format(
+                "Betrag 50 Euro doppelpunkt neue Zeile 12.04.2026 fragezeichen",
+                true
+            ),
             "Betrag 50 Euro:\n12.04.2026?"
         );
     }
@@ -212,10 +218,16 @@ mod tests {
     #[test]
     fn english_commands_and_mixed_language() {
         assert_eq!(
-            format("Hello comma Welt exclamation mark new paragraph Grüße full stop", true),
+            format(
+                "Hello comma Welt exclamation mark new paragraph Grüße full stop",
+                true
+            ),
             "Hello, Welt!\n\nGrüße."
         );
-        assert_eq!(format("Yes semicolon no colon maybe", true), "Yes; no: maybe");
+        assert_eq!(
+            format("Yes semicolon no colon maybe", true),
+            "Yes; no: maybe"
+        );
     }
 
     #[test]
@@ -228,7 +240,10 @@ mod tests {
     #[test]
     fn quotations_code_and_literal_mode_are_protected() {
         assert_eq!(
-            format("Er sagt \"neue Zeile\" und schreibt `punkt` komma fertig", true),
+            format(
+                "Er sagt \"neue Zeile\" und schreibt `punkt` komma fertig",
+                true
+            ),
             "Er sagt \"neue Zeile\" und schreibt `punkt`, fertig"
         );
         assert_eq!(
@@ -240,11 +255,17 @@ mod tests {
             "Zitat \"'neue Zeile' und Punkt\", Ende"
         );
         assert_eq!(
-            format("Code literalmodus an neue Zeile komma literalmodus aus Punkt", true),
+            format(
+                "Code literalmodus an neue Zeile komma literalmodus aus Punkt",
+                true
+            ),
             "Code neue Zeile komma."
         );
         assert_eq!(
-            format("Er sagt anführungszeichen auf neue Zeile komma anführungszeichen zu punkt", true),
+            format(
+                "Er sagt anführungszeichen auf neue Zeile komma anführungszeichen zu punkt",
+                true
+            ),
             "Er sagt \"neue Zeile komma\"."
         );
     }
