@@ -2,16 +2,8 @@ name: CI
 
 on:
   pull_request:
-    paths:
-      - '**'
-      - '!**/*.md'
-      - '!LICENSE'
   push:
     branches: [main]
-    paths:
-      - '**'
-      - '!**/*.md'
-      - '!LICENSE'
   workflow_call:
 
 permissions:
