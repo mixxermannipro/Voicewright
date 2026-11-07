@@ -31,7 +31,7 @@ aus einem Diktat ausgeführt.
 Alle Vergleiche beachten Wortgrenzen und Groß-/Kleinschreibung wird
 ignoriert. Ein Begriff wie `Punktland` bleibt erhalten.
 Text zwischen bereits erkannten Anführungszeichen (`"…"`,
-`„…“`) oder Backticks (``…``) bleibt wörtlich.
+`„…“`) oder Backticks (z. B. `code`) bleibt wörtlich.
 Ein gesprochener Öffnungsbefehl schützt die Passage bis zu seinem
 gesprochenen Schließbefehl. Mit `Literalmodus an` und
 `Literalmodus aus` lassen sich auch unzitierte Passagen schützen.
