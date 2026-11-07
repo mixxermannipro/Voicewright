@@ -72,6 +72,39 @@ sie wurden hier **nicht ausgeführt**. Später mindestens prüfen:
 
 Dokumentation: [Gesprochene Textformatierung](SPOKEN_FORMATTING.md).
 
+## Ersteinrichtung – manuelle Release-Abnahme (Issue #22)
+
+**Nicht ausgeführt:** Die folgenden Punkte sind für die abschließende
+Abnahme auf echten Windows-, macOS- und Linux-Rechnern vorgesehen.
+
+- Frische Settings ohne `onboarding_complete`: Assistent erscheint auf
+  Übersicht und zeigt Datenschutz, Modell, Mikrofon und externen Test.
+- Offline-Standard: `cleanup_mode=off` ohne Provider-Schlüssel. **Keine
+  Cloud-Requests**, keine automatischen Modell-Downloads beim ersten Start.
+- Modell-Download erst nach Klick, Größe/Status/Abbruch sichtbar,
+  defekter Download, voller Datenträger und Netzverlust abfangen.
+- Erst bei **installiertem gewähltem Sprachmodell** darf Modellschritt
+  fortgesetzt werden. Offline-Erkennung nach erfolgreichem Download.
+- Cloud-Korrektur bewusst einschalten: Warnung und **gesperrter**
+  geführter Mikrofontest, bis Cloud-Modus wieder deaktiviert und
+  gespeichert wurde.
+- Mikrofonberechtigungen verweigern/gewähren, Gerät umstecken/wechseln,
+  Pegel, Abbruch sowie Erfolg mit echtem, nicht leerem Transkript.
+- Fokus in normaler externer Textanwendung, globale Kombination,
+  Textinsertion oder Copy-Fallback; Wayland und macOS separat prüfen.
+- Assistent während der Einrichtung schließen und erneut starten:
+  `onboarding_step` bleibt erhalten, ein fertiger Assistent bleibt
+  ausgeblendet; die Wiederholung über Einstellungen funktioniert.
+- Offene unspeicherte Änderungen blockieren Fortschrittsspeicherung;
+  beim Import auf ein anderes Gerät wird der Assistent zurückgesetzt.
+- NVDA, VoiceOver, Orca: Fokusfolge, Ansagen, Tastaturbedienung,
+  200%-Zoom sowie Download- und Mikrofonstatus prüfen.
+
+Drei neue TypeScript-Tests in `src/domain.test.ts` decken die
+Fortschrittsbedingungen ab. Rust-Unit-Test für Persistenz und
+Import-Reset. **Diese Tests sind geschrieben, aber nicht ausgeführt.**
+Siehe [Ersteinrichtung](ONBOARDING.md).
+
 ## Sicherheitsprüfungen vor Release
 
 Das [Bedrohungsmodell](THREAT_MODEL.md) definiert die Szenarien S01–S10:
