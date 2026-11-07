@@ -277,6 +277,18 @@ mod tests {
     }
 
     #[test]
+    fn spoken_formatting_is_opt_in_and_missing_legacy_field_stays_off() {
+        assert!(!Settings::default().spoken_formatting);
+        let settings: Settings = serde_json::from_str(r#"{"schema_version":3}"#).unwrap();
+        assert!(!settings.spoken_formatting);
+        let mut enabled = Settings::default();
+        enabled.spoken_formatting = true;
+        let serialized = serde_json::to_string(&enabled).unwrap();
+        let restored: Settings = serde_json::from_str(&serialized).unwrap();
+        assert!(restored.spoken_formatting);
+    }
+
+    #[test]
     fn saves_settings_and_keeps_translation_opt_in() {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("settings.json");
