@@ -3,6 +3,7 @@
 mod app;
 mod audio;
 mod cleanup;
+mod guard;
 mod insertion;
 mod models;
 mod providers;
