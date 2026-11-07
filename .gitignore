@@ -1,0 +1,12 @@
+/node_modules/
+/dist/
+/src-tauri/target/
+/engines/cleanup/target/
+/src-tauri/binaries/*
+/src-tauri/gen/
+*.gguf
+ggml-*.bin
+*.part
+.env
+.env.*
+.DS_Store
