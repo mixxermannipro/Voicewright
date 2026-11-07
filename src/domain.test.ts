@@ -32,6 +32,7 @@ describe('first-run progress gates', () => {
     expect(canAdvanceSetup(2, true, { phase: 'failed', transcript: 'test' })).toBe(false);
     expect(canAdvanceSetup(2, true, { phase: 'completed', transcript: ' ' })).toBe(false);
     expect(canAdvanceSetup(2, true, { phase: 'completed', transcript: 'Hallo Welt' })).toBe(true);
+    expect(canAdvanceSetup(2, true, { phase: 'completed', transcript: 'Hallo Welt' }, false, true)).toBe(false);
   });
   it('never claims an external shortcut test without explicit acknowledgement', () => {
     expect(canAdvanceSetup(3, true, undefined, false)).toBe(false);
