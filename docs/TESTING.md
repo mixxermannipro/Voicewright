@@ -47,6 +47,31 @@ Windows/macOS/Linux sind für die finale Abnahme erforderlich.
 Die Implementierung wurde auf GitHub vorbereitet, aber diese Tests
 sind aktuell ausdrücklich **nicht durchgeführt**.
 
+## Gesprochene Textbefehle: Regression und reale Abnahme (Issue #34)
+
+Die neue Einstellung `spoken_formatting` ist **standardmäßig aus**.
+Die Pure-Rust-Tests in `src-tauri/src/spoken_format.rs` sind angelegt;
+sie wurden hier **nicht ausgeführt**. Später mindestens prüfen:
+
+- DE: `Hallo komma Welt ausrufezeichen neuer Absatz München punkt`
+  ergibt `Hallo, Welt!` plus Leerzeile plus `München.`.
+- EN/mixed: `Hello comma Welt new line Grüße full stop`.
+- Zitate und Code: `"neue Zeile"` oder ein Backtick-Codeblock
+  werden nicht als Steuerwörter interpretiert.
+- `Literalmodus an ... Literalmodus aus` schützt Satzzeichenwörter;
+  ausgeschalteter Modus gibt den Originaltext unverändert aus.
+- `Punktland`, Zahlen, Datumsangaben, Dialektwörter,
+  Wiederholungen und unbekannte Phrasen bleiben erhalten.
+- Keine OS-Aktionen durch Worte wie `Enter`, `alles löschen`
+  oder `sudo`; der Parser darf nur den Textbuffer verändern.
+- Reale Diktate unter Windows, macOS, Linux und mit
+  ausgeschalteter/lokaler/Cloud-Korrektur: überprüfen, dass die
+  formatierten Texte sicher eingefügt oder kopiert werden.
+- Aufnahme während des Einstellungswechsels muss bei ihrem
+  vorher gespeicherten Sitzungswert bleiben.
+
+Dokumentation: [Gesprochene Textformatierung](SPOKEN_FORMATTING.md).
+
 ## Sicherheitsprüfungen vor Release
 
 Das [Bedrohungsmodell](THREAT_MODEL.md) definiert die Szenarien S01–S10:

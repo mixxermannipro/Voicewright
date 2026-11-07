@@ -40,6 +40,7 @@ export type Settings = {
   presets: Record<string, string>;
   translation: string;
   vocabulary: string;
+  spoken_formatting: boolean;
   fallback: boolean;
   auto_insert: boolean;
   shortcut: string;

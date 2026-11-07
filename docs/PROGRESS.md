@@ -43,6 +43,23 @@ vereinbarungsgemäß für die spätere Abnahme ausstehend. Ein gemergter
 Code-PR bedeutet noch keine bestätigte Funktionsfähigkeit. Issue #26
 bleibt für vollständige Löschroutine und Tests offen.
 
+## Gesprochene Textformatierung (Issue #34)
+
+Ein isolierter, opt-in-Parser wandelt definierte deutsche und englische
+Satzzeichenwörter sowie Zeilen- und Absatzbefehle in reine Textformatierung
+um. Im Auslieferungszustand bleibt die Funktion aus. Zitierter Text,
+Backtick-Code und explizite Literalpassagen werden geschützt.
+Gesprochene Befehle lösen **keine** OS-Aktionen aus.
+Die Verarbeitung findet nach Whisper und vor optionaler KI-Korrektur
+auf dem aktiven Sitzungs-Snapshot statt. Die
+[Benutzeranleitung](SPOKEN_FORMATTING.md) dokumentiert Vokabular
+und Grenzen. Zahlen/Datum werden nicht umgerechnet.
+
+**Teststatus:** Pure-Rust-Unit-Tests wurden hinzugefügt, aber nicht
+ausgeführt; echte DE/EN-Audiotests, npm/Cargo und Plattformprüfungen
+stehen weiterhin aus. Issue #34 bleibt für reale Abnahme und
+fortgeschrittene Zahlen-/Datumsformatierung offen.
+
 ## Was vorhanden ist
 
 - Deutsch-englische Tauri-Oberfläche mit Übersicht, Kurzanleitung, Mikrofonwahl, konfigurierbarem Tastenkürzel, Halten und Umschalten, Aufnahmepegel, Abbruch, Statussymbol und Kopiermöglichkeit. Einstellungen bleiben nach Neustart erhalten. Die App speichert keinen Diktatverlauf.

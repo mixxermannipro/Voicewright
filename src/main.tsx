@@ -325,6 +325,13 @@ function App() {
           </select></Field>
           <label className="check"><input type="checkbox" checked={draft.auto_insert} onChange={(event) => update('auto_insert', event.target.checked)} />
             {t('Fertigen Text im geprüften Zielfenster einfügen', 'Insert finished text in the verified target window')}</label>
+          <label className="check"><input type="checkbox" checked={draft.spoken_formatting}
+            onChange={(event) => update('spoken_formatting', event.target.checked)} />
+            {t('Gesprochene Satzzeichen und Zeilenumbrüche erkennen (optional)', 'Recognize spoken punctuation and line breaks (optional)')}</label>
+          <p className="muted small">{t(
+            'Nur bei Aktivierung: „Komma“, „Punkt“, „Fragezeichen“, „neue Zeile“, „neuer Absatz“ und englische Varianten werden lokal in Textzeichen umgewandelt. Mit „Literalmodus an“ und „Literalmodus aus“ bleiben Befehlswörter wörtlich; Anführungszeichen und Code werden geschützt. Es werden keine Systemaktionen ausgeführt.',
+            'When enabled, “comma”, “period”, “question mark”, “new line”, “new paragraph” and German equivalents become text punctuation locally. “Literal mode on” / “literal mode off” preserve command words; quotes and code are protected. No system actions are executed.',
+          )}</p>
         </Section>
         <Section title={t('Sicherung und Wiederherstellung', 'Backup and restore')} description={t(
           'Einstellungen werden lokal gespeichert. Export enthält weder API-Schlüssel noch Audio oder Diktattexte. Schlüssel und Modelle bleiben bei einem Reset erhalten.',

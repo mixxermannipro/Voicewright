@@ -2,6 +2,7 @@ use crate::{
     audio::{self, Capture},
     cleanup, guard, insertion, models, providers, settings_portable,
     session::{apply_shortcut_changes, Action, HotkeyState, Phase, ShortcutKind, Status},
+    spoken_format,
     settings::{self, CleanupMode, RecordingMode, Settings},
     speech,
 };
@@ -446,6 +447,9 @@ async fn pipeline(
     if transcript.is_empty() {
         return Err("No speech was detected.".into());
     }
+    // Deterministic, local and opt-in; never interprets text as an OS action.
+    // Captured settings belong to this session, so toggling cannot race a dictation.
+    let transcript = spoken_format::format(&transcript, settings.spoken_formatting);
 
     let state = app.state::<AppState>();
     {

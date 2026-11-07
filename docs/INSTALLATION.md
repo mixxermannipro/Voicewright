@@ -14,6 +14,14 @@ aber vertrauliche Informationen enthalten. Details zu Schema-Migration,
 Backup beschädigter Dateien und dem sicheren Wiederherstellen stehen
 unter [Einstellungs-Backup](SETTINGS_BACKUP.md).
 
+## Optionale Diktatbefehle
+
+Unter **Einstellungen → Aufnahmeverhalten** kannst du explizite
+gesprochene Satzzeichen und Zeilenumbrüche einschalten. Standardmäßig
+bleibt die Funktion aus, und bei Aktivierung werden ausschließlich
+Textzeichen umgewandelt, keine Betriebssystembefehle ausgeführt.
+Liste, Beispiele und Grenzen: [Gesprochene Textformatierung](SPOKEN_FORMATTING.md).
+
 ## Für Nutzer
 
 1. Wähle ein Paket für dein Betriebssystem und deine Prozessorart. Vergleiche

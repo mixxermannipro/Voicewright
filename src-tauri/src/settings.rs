@@ -53,6 +53,8 @@ pub struct Settings {
     pub presets: BTreeMap<String, String>,
     pub translation: String,
     pub vocabulary: String,
+    /// Opt-in only: transform explicit spoken punctuation in the transcript.
+    pub spoken_formatting: bool,
     pub fallback: bool,
     pub auto_insert: bool,
     pub shortcut: String,
@@ -76,6 +78,7 @@ impl Default for Settings {
             presets: BTreeMap::new(),
             translation: String::new(),
             vocabulary: String::new(),
+            spoken_formatting: false,
             fallback: true,
             auto_insert: true,
             shortcut: "Ctrl+Shift+Space".into(),
@@ -271,6 +274,18 @@ mod tests {
         fs::write(&path, future).unwrap();
         assert!(save(&path, &Settings::default()).is_err());
         assert_eq!(fs::read(&path).unwrap(), future);
+    }
+
+    #[test]
+    fn spoken_formatting_is_opt_in_and_missing_legacy_field_stays_off() {
+        assert!(!Settings::default().spoken_formatting);
+        let settings: Settings = serde_json::from_str(r#"{"schema_version":3}"#).unwrap();
+        assert!(!settings.spoken_formatting);
+        let mut enabled = Settings::default();
+        enabled.spoken_formatting = true;
+        let serialized = serde_json::to_string(&enabled).unwrap();
+        let restored: Settings = serde_json::from_str(&serialized).unwrap();
+        assert!(restored.spoken_formatting);
     }
 
     #[test]
