@@ -26,6 +26,17 @@ Zugangsdaten-Speicher. Ein über die Oberfläche kopierter Text landet in der
 System-Zwischenablage. Je nach Betriebssystem können Zwischenablage-Verlauf
 und geräteübergreifende Synchronisierung den kopierten Text übernehmen.
 
+## Ersteinrichtung und lokale Einstellungen
+
+Der Ersteinrichtungsassistent speichert nur seinen Fortschritt
+(`onboarding_step`, `onboarding_complete`) in den regulären lokalen
+Einstellungen. Es werden dadurch keine Aufnahmen, Diktate oder
+Zugangsdaten gespeichert. Ein Modell-Download erfolgt nur nach
+ausdrücklichem Klick. Für den geführten Mikrofontest muss
+Cloud-Korrektur ausgeschaltet sein; ein Cloud-Konto ist nicht nötig.
+Ein abgebrochener Assistent kann später fortgesetzt werden.
+Details: [Ersteinrichtung](docs/ONBOARDING.md).
+
 ## Exportierte Einstellungen
 
 Mit der optionalen Funktion „Gespeicherte Einstellungen exportieren“
