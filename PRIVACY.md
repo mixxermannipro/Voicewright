@@ -26,6 +26,18 @@ Zugangsdaten-Speicher. Ein über die Oberfläche kopierter Text landet in der
 System-Zwischenablage. Je nach Betriebssystem können Zwischenablage-Verlauf
 und geräteübergreifende Synchronisierung den kopierten Text übernehmen.
 
+## Exportierte Einstellungen
+
+Mit der optionalen Funktion „Gespeicherte Einstellungen exportieren“
+erzeugt die App eine lokale JSON-Datei mit Einstellungen, persönlichen
+Vorlagen und Wörtern, Modellreferenzen und konfigurierten
+Provider-Adressen. Diese Datei enthält keine API-Schlüssel aus dem
+OS-Passwortspeicher, keine Audiodateien und keine Diktattexte.
+Eigene Wörterlisten oder Prompts können trotzdem private Inhalte haben.
+Der Import zeigt eine Vorschau und deaktiviert die Cloud-Korrektur,
+bis sie ausdrücklich wieder eingeschaltet wird. Siehe
+[Einstellungs-Backup](docs/SETTINGS_BACKUP.md).
+
 ## Wichtige Grenzen und Benutzerkontrolle
 
 - **Lokale Diktate:** Für reine Audioerkennung und lokale Textkorrektur ist

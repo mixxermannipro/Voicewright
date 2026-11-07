@@ -1,7 +1,10 @@
-use crate::providers::ProviderConfig;
+use crate::{providers::ProviderConfig, settings_portable};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fs, io::Write, path::Path};
 use tauri_plugin_global_shortcut::Shortcut;
+
+pub const SETTINGS_SCHEMA_VERSION: u32 = 3;
+fn legacy_schema_version() -> u32 { 1 }
 
 pub const DEFAULT_PROMPT: &str = concat!(
     "You are a transcription editor, not a conversational assistant. ",
@@ -37,6 +40,8 @@ pub enum RecordingMode {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub struct Settings {
+    #[serde(default = "legacy_schema_version")]
+    pub schema_version: u32,
     pub locale: String,
     pub speech_language: String,
     pub speech_model: String,
@@ -59,6 +64,7 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            schema_version: SETTINGS_SCHEMA_VERSION,
             locale: "de".into(),
             speech_language: "auto".into(),
             speech_model: "whisper-base".into(),
@@ -82,6 +88,9 @@ impl Default for Settings {
 
 impl Settings {
     pub fn validate(&self) -> Result<(), String> {
+        if self.schema_version != SETTINGS_SCHEMA_VERSION {
+            return Err("Unsupported settings schema version.".into());
+        }
         if !matches!(self.locale.as_str(), "de" | "en")
             || self.speech_language.len() > 16
             || !self
@@ -174,16 +183,36 @@ pub fn load(path: &Path) -> Result<Settings, String> {
         }
         Err(_) => return Err("Could not read settings.".into()),
     };
-    let settings: Settings =
-        serde_json::from_slice(&bytes).map_err(|_| "The settings file is invalid.")?;
-    settings.validate()?;
-    Ok(settings)
+    match settings_portable::decode(&bytes) {
+        Ok(settings) => Ok(settings),
+        Err(error) => {
+            settings_portable::back_up_invalid(path, &bytes)?;
+            Err(format!("{error} An untouched backup was saved as settings.invalid-NN.bak."))
+        }
+    }
 }
 
 pub fn save(path: &Path, settings: &Settings) -> Result<(), String> {
     settings.validate()?;
     let parent = path.parent().ok_or("Invalid settings directory.")?;
     fs::create_dir_all(parent).map_err(|_| "Could not create the settings directory.")?;
+    // Even if startup recovered with defaults, do not discard a broken file
+    // without safely preserving its exact bytes first.
+    match fs::read(path) {
+        Ok(bytes) if settings_portable::decode(&bytes).is_err() => {
+            // Do not downgrade an unknown future format, even with a backup.
+            if let Ok(value) = serde_json::from_slice::<serde_json::Value>(&bytes) {
+                if value.get("schema_version").and_then(serde_json::Value::as_u64)
+                    .is_some_and(|version| version > u64::from(SETTINGS_SCHEMA_VERSION)) {
+                    return Err("A newer Voicewright version created this settings file; it was not overwritten.".into());
+                }
+            }
+            settings_portable::back_up_invalid(path, &bytes)?;
+        }
+        Ok(_) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(_) => return Err("Could not inspect existing settings.".into()),
+    }
     let mut file =
         tempfile::NamedTempFile::new_in(parent).map_err(|_| "Could not write settings.")?;
     serde_json::to_writer_pretty(&mut file, settings).map_err(|_| "Could not encode settings.")?;
@@ -217,6 +246,31 @@ mod tests {
         assert!(system.contains("Ticket 4B"));
         settings.prompt = "CUSTOM".into();
         assert!(settings.system_prompt().starts_with("CUSTOM"));
+    }
+
+    #[test]
+    fn loading_broken_settings_copies_original_before_reporting_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        fs::write(&path, b"{broken").unwrap();
+        assert!(load(&path).unwrap_err().contains("backup"));
+        assert_eq!(fs::read(&path).unwrap(), b"{broken");
+        assert_eq!(
+            fs::read(path.with_extension("invalid-01.bak")).unwrap(),
+            b"{broken"
+        );
+        save(&path, &Settings::default()).unwrap();
+        assert_eq!(load(&path).unwrap().schema_version, SETTINGS_SCHEMA_VERSION);
+    }
+
+    #[test]
+    fn never_overwrites_a_future_settings_schema() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        let future = br#"{"schema_version":999,"prompt":"future prompt"}"#;
+        fs::write(&path, future).unwrap();
+        assert!(save(&path, &Settings::default()).is_err());
+        assert_eq!(fs::read(&path).unwrap(), future);
     }
 
     #[test]

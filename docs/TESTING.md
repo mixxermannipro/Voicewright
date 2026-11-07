@@ -20,6 +20,33 @@ npm audit --audit-level=high
 Der GitHub-Ablauf prüft zusätzlich beide Rust-Abhängigkeitslisten mit
 `cargo audit`. Dafür wird `cargo-audit` aus RustSec benötigt.
 
+## Regressionen für Einstellungen und Sicherung (Issue #26)
+
+Zusätzlich zu den Rust-Unit-Tests aus
+`src-tauri/src/settings_portable.rs` und
+`src-tauri/src/settings.rs` müssen **nachgelagert** auf echten
+Zielplattformen geprüft werden:
+
+1. Alte Alpha-Settings ohne Schemanummer sowie zwei synthetische
+   Migrationsversionen v1/v2 laden, speichern und idempotent neu laden.
+2. Fehlerhafte oder zu neue JSON-Datei; die Originalbytes und
+   fortlaufende private `settings.invalid-NN.bak`-Kopie bleiben erhalten.
+3. Export mit DE/EN, Umlauten, ß, Presets, Glossar, Providerkonfiguration
+   und eigenen Modellreferenzen; Import-Vorschau und Speichern.
+4. Abgebrochener Import und abgebrochener Dateidialog verändern weder
+   Einstellungen noch API-Schlüssel oder Modelle.
+5. Nach Import ist Cloud-Modus **Aus**, Mikrofonzuordnung neutralisiert
+   und kein Cloud-Request ohne neue Aktivierung möglich.
+6. Fehlerhafte Shortcuts, ungültige Provider-URL, übergroße JSON und
+   Read-only-Dateisystem: Fehler erkennbar, kein Verlust der alten Daten.
+7. Werkseinstellungen vormerken, Entwurf verwerfen, Speichern, Neustart
+   sowie Keyring- und Modellbestand prüfen.
+
+Ein dokumentierter Checkout und die echten Dialogtests auf
+Windows/macOS/Linux sind für die finale Abnahme erforderlich.
+Die Implementierung wurde auf GitHub vorbereitet, aber diese Tests
+sind aktuell ausdrücklich **nicht durchgeführt**.
+
 ## Sicherheitsprüfungen vor Release
 
 Das [Bedrohungsmodell](THREAT_MODEL.md) definiert die Szenarien S01–S10:

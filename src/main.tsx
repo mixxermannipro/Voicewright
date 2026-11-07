@@ -53,6 +53,8 @@ function App() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [saving, setSaving] = useState(false);
+  const [settingsImport, setSettingsImport] = useState<Settings | null>(null);
+  const [transferringSettings, setTransferringSettings] = useState(false);
   const [microphones, setMicrophones] = useState<{ id: string; label: string }[]>([]);
   const locale = draft?.locale ?? 'de';
   const t: Copy = (de, en) => locale === 'de' ? de : en;
@@ -117,6 +119,45 @@ function App() {
     finally { setSaving(false); }
   };
   const save = (event: FormEvent) => { event.preventDefault(); void saveSettings(); };
+
+  const exportPreferences = async () => {
+    setError(''); setNotice(''); setTransferringSettings(true);
+    try {
+      const exported = await invoke<boolean>('export_settings');
+      if (exported) setNotice(t('Gespeicherte Einstellungen exportiert. API-Schlüssel und Audio sind nicht enthalten.',
+        'Saved settings exported. API keys and audio are not included.'));
+    } catch (cause) { setError(String(cause)); }
+    finally { setTransferringSettings(false); }
+  };
+  const previewPreferences = async () => {
+    setError(''); setNotice(''); setTransferringSettings(true); setSettingsImport(null);
+    try {
+      const imported = await invoke<Settings | null>('import_settings_preview');
+      if (imported) setSettingsImport(imported);
+    } catch (cause) { setError(String(cause)); }
+    finally { setTransferringSettings(false); }
+  };
+  const stagePreferences = () => {
+    if (!settingsImport) return;
+    setDraft(settingsImport);
+    setSettingsImport(null);
+    setNotice(t('Import zur Prüfung übernommen. Speichern aktiviert die Einstellungen.',
+      'Imported preferences staged for review. Save to activate them.'));
+  };
+  const resetPreferences = async () => {
+    if (!window.confirm(t(
+      'Einstellungen auf die Standardwerte zurücksetzen? API-Schlüssel und installierte Modelle bleiben erhalten. Erst Speichern macht die Änderung dauerhaft.',
+      'Reset preferences to defaults? API keys and installed models stay. Changes are permanent only after saving.',
+    ))) return;
+    setError('');
+    try {
+      const defaults = await invoke<Settings>('default_settings');
+      setDraft(defaults);
+      setSettingsImport(null);
+      setNotice(t('Standardwerte vorgemerkt. Speichern oder Änderungen verwerfen.',
+        'Defaults staged. Save or discard changes.'));
+    } catch (cause) { setError(String(cause)); }
+  };
 
   const installed = status?.installed ?? [];
   const labels = {
@@ -284,6 +325,45 @@ function App() {
           </select></Field>
           <label className="check"><input type="checkbox" checked={draft.auto_insert} onChange={(event) => update('auto_insert', event.target.checked)} />
             {t('Fertigen Text im geprüften Zielfenster einfügen', 'Insert finished text in the verified target window')}</label>
+        </Section>
+        <Section title={t('Sicherung und Wiederherstellung', 'Backup and restore')} description={t(
+          'Einstellungen werden lokal gespeichert. Export enthält weder API-Schlüssel noch Audio oder Diktattexte. Schlüssel und Modelle bleiben bei einem Reset erhalten.',
+          'Preferences are stored locally. Exports contain no API keys, audio or dictations. A reset leaves keys and models untouched.',
+        )}>
+          <div className="actions">
+            <button type="button" disabled={busy || saving || transferringSettings} onClick={() => void exportPreferences()}>
+              {t('Gespeicherte Einstellungen exportieren', 'Export saved settings')}</button>
+            <button type="button" disabled={busy || saving || transferringSettings} onClick={() => void previewPreferences()}>
+              {t('Einstellungen importieren', 'Import settings')}</button>
+          </div>
+          {settingsImport && <div className="message">
+            <h3>{t('Import-Vorschau (noch nicht übernommen)', 'Import preview (not applied)')}</h3>
+            <p>{t('Sprache', 'Language')}: {settingsImport.locale.toUpperCase()} ·
+              {t('Sprachmodell', 'Speech model')}: {settingsImport.speech_model}</p>
+            <p>{t('Eigene Vorlagen', 'Custom presets')}: {Object.keys(settingsImport.presets).length} ·
+              {t('Vokabularzeichen', 'Vocabulary characters')}: {settingsImport.vocabulary.length} ·
+              {t('Anbieter-Konfigurationen', 'Provider configurations')}: {Object.keys(settingsImport.providers).length}</p>
+            <p className="muted small">{t(
+              'Cloud-Korrektur wurde beim Import deaktiviert und die frühere Mikrofonkennung entfernt. Schlüssel werden nicht mit importiert. Prüfe die übrigen Werte vor dem Speichern.',
+              'Cloud editing was disabled during import and the previous microphone identifier cleared. No keys are imported. Review the remaining values before saving.',
+            )}</p>
+            <div className="actions">
+              <button type="button" onClick={stagePreferences}>{t('In Einstellungen übernehmen', 'Stage imported settings')}</button>
+              <button type="button" onClick={() => setSettingsImport(null)}>{t('Import verwerfen', 'Discard import')}</button>
+            </div>
+          </div>}
+          <div className="actions">
+            <button type="button" disabled={busy || saving || transferringSettings} onClick={() => void resetPreferences()}>
+              {t('Werkseinstellungen vormerken', 'Stage factory defaults')}</button>
+            <button type="button" disabled={!changed || busy || saving} onClick={() => { setDraft(saved); setSettingsImport(null); setNotice(t(
+              'Nicht gespeicherte Änderungen verworfen.', 'Unsaved changes discarded.',
+            )); }}>
+              {t('Änderungen verwerfen', 'Discard unsaved changes')}</button>
+          </div>
+          <p className="muted small">{t(
+            'Der Export umfasst gespeicherte Einstellungen, nicht ungespeicherte Entwürfe. Ein Import wird erst nach Klick auf Speichern aktiv. Persönliche Modell- und Schlüsselbunddaten müssen separat gelöscht werden.',
+            'Exports use saved settings, not unsaved drafts. Imports become active only after saving. Model files and keyring entries must be removed separately.',
+          )}</p>
         </Section>
       </>}
       {page === 'privacy' && <>

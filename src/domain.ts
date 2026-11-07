@@ -28,6 +28,7 @@ export type Model = {
   id: string; name: string; kind: Kind; url: string; bytes: number; sha256: string; license: string; ram_gib: number;
 };
 export type Settings = {
+  schema_version: number;
   locale: 'de' | 'en';
   speech_language: string;
   speech_model: string;
