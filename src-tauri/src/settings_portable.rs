@@ -174,12 +174,14 @@ mod tests {
     fn portable_roundtrip_never_reenables_cloud_or_imports_mic_id() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("prefs.json");
-        let mut settings = Settings::default();
-        settings.prompt = "Private Begriffe Ä, Ü, ß".into();
-        settings.vocabulary = "Oachkatzlschwoaf".into();
-        settings.microphone = Some("specific-device-123".into());
-        settings.onboarding_step = 3;
-        settings.onboarding_complete = true;
+        let settings = Settings {
+            prompt: "Private Begriffe Ä, Ü, ß".into(),
+            vocabulary: "Oachkatzlschwoaf".into(),
+            microphone: Some("specific-device-123".into()),
+            onboarding_step: 3,
+            onboarding_complete: true,
+            ..Default::default()
+        };
         export(&path, &settings).unwrap();
         let raw = fs::read(&path).unwrap();
         let imported = import(&raw).unwrap();
