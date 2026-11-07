@@ -47,6 +47,8 @@ export type Settings = {
   cancel_shortcut: string;
   recording_mode: 'hold' | 'toggle';
   microphone: string | null;
+  onboarding_step: number;
+  onboarding_complete: boolean;
 };
 export type Initial = {
   settings: Settings; catalog: Model[];
