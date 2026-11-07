@@ -76,11 +76,12 @@ export function canAdvanceSetup(
   modelReady: boolean,
   status: Pick<Status, 'phase' | 'transcript'> | undefined,
   acknowledgedExternal = false,
+  cloudEnabled = false,
 ): boolean {
   switch (step) {
     case 0: return true;
     case 1: return modelReady;
-    case 2: return status?.phase === 'completed' && Boolean(status.transcript?.trim());
+    case 2: return !cloudEnabled && status?.phase === 'completed' && Boolean(status.transcript?.trim());
     case 3: return acknowledgedExternal;
     default: return false;
   }
