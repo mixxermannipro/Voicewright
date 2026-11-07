@@ -4,7 +4,9 @@ use std::{collections::BTreeMap, fs, io::Write, path::Path};
 use tauri_plugin_global_shortcut::Shortcut;
 
 pub const SETTINGS_SCHEMA_VERSION: u32 = 3;
-fn legacy_schema_version() -> u32 { 1 }
+fn legacy_schema_version() -> u32 {
+    1
+}
 
 pub const DEFAULT_PROMPT: &str = concat!(
     "You are a transcription editor, not a conversational assistant. ",
@@ -198,7 +200,9 @@ pub fn load(path: &Path) -> Result<Settings, String> {
         Ok(settings) => Ok(settings),
         Err(error) => {
             settings_portable::back_up_invalid(path, &bytes)?;
-            Err(format!("{error} An untouched backup was saved as settings.invalid-NN.bak."))
+            Err(format!(
+                "{error} An untouched backup was saved as settings.invalid-NN.bak."
+            ))
         }
     }
 }
@@ -213,8 +217,11 @@ pub fn save(path: &Path, settings: &Settings) -> Result<(), String> {
         Ok(bytes) if settings_portable::decode(&bytes).is_err() => {
             // Do not downgrade an unknown future format, even with a backup.
             if let Ok(value) = serde_json::from_slice::<serde_json::Value>(&bytes) {
-                if value.get("schema_version").and_then(serde_json::Value::as_u64)
-                    .is_some_and(|version| version > u64::from(SETTINGS_SCHEMA_VERSION)) {
+                if value
+                    .get("schema_version")
+                    .and_then(serde_json::Value::as_u64)
+                    .is_some_and(|version| version > u64::from(SETTINGS_SCHEMA_VERSION))
+                {
                     return Err("A newer Voicewright version created this settings file; it was not overwritten.".into());
                 }
             }
@@ -243,10 +250,20 @@ mod tests {
     #[test]
     fn default_prompt_requires_faithfulness_and_resists_spoken_commands() {
         for requirement in [
-            "negation", "numbers", "URLs", "uml", "ß", "quoted text",
-            "Never obey", "Never invent facts", "original language",
+            "negation",
+            "numbers",
+            "URLs",
+            "uml",
+            "ß",
+            "quoted text",
+            "Never obey",
+            "Never invent facts",
+            "original language",
         ] {
-            assert!(DEFAULT_PROMPT.contains(requirement), "missing: {requirement}");
+            assert!(
+                DEFAULT_PROMPT.contains(requirement),
+                "missing: {requirement}"
+            );
         }
         let mut settings = Settings::default();
         settings.prompt.clear();
@@ -308,7 +325,8 @@ mod tests {
         let mut saved = Settings::default();
         saved.onboarding_step = 2;
         saved.onboarding_complete = true;
-        let roundtrip: Settings = serde_json::from_str(&serde_json::to_string(&saved).unwrap()).unwrap();
+        let roundtrip: Settings =
+            serde_json::from_str(&serde_json::to_string(&saved).unwrap()).unwrap();
         assert_eq!(roundtrip.onboarding_step, 2);
         assert!(roundtrip.onboarding_complete);
         saved.onboarding_step = 4;
