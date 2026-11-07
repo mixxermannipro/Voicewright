@@ -171,6 +171,18 @@ mod tests {
         let json = String::from_utf8(raw).unwrap();
         assert!(!json.contains("api_key"));
         assert!(!json.contains("transcript"));
+
+        let mut cloud = Settings::default();
+        cloud.providers.insert("open_ai".into(), crate::providers::ProviderConfig {
+            provider: crate::providers::Provider::OpenAi,
+            endpoint: None,
+            model: "test-model".into(),
+        });
+        cloud.cleanup_mode = CleanupMode::Cloud;
+        export(&path, &cloud).unwrap();
+        let imported_cloud = import(&fs::read(&path).unwrap()).unwrap();
+        assert_eq!(imported_cloud.cleanup_mode, CleanupMode::Off);
+        assert!(imported_cloud.providers.contains_key("open_ai"));
     }
 
     #[test]
