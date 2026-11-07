@@ -6,6 +6,7 @@ import {
   formatDuration, inProgress, providers, shortcutFromKey,
   type Initial, type Kind, type Phase, type Provider, type ProviderConfig, type Settings, type Status,
 } from './domain';
+import { FirstRunGuide } from './FirstRunGuide';
 import './style.css';
 
 type Copy = (de: string, en: string) => string;
@@ -53,6 +54,7 @@ function App() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [saving, setSaving] = useState(false);
+  const [guideSaving, setGuideSaving] = useState(false);
   const [settingsImport, setSettingsImport] = useState<Settings | null>(null);
   const [transferringSettings, setTransferringSettings] = useState(false);
   const [microphones, setMicrophones] = useState<{ id: string; label: string }[]>([]);
@@ -119,6 +121,27 @@ function App() {
     finally { setSaving(false); }
   };
   const save = (event: FormEvent) => { event.preventDefault(); void saveSettings(); };
+  const saveGuideProgress = async (step: number, complete: boolean) => {
+    // The guide must not silently save unrelated edits made on other pages.
+    if (changed || saving || guideSaving || busy) {
+      setError(t('Speichere zuerst offene Änderungen und beende laufende Diktate.',
+        'Save pending changes and finish active dictations first.'));
+      return;
+    }
+    const next: Settings = { ...saved, onboarding_step: step, onboarding_complete: complete };
+    setGuideSaving(true);
+    setError('');
+    try {
+      await invoke('save_settings', { value: next });
+      setSaved(next);
+      setDraft(next);
+      setNotice(complete ? t('Ersteinrichtung abgeschlossen.', 'First-run setup completed.') :
+        t('Einrichtungsfortschritt gespeichert.', 'Setup progress saved.'));
+      if (!complete) setPage('dashboard');
+    } catch (cause) { setError(String(cause)); }
+    finally { setGuideSaving(false); }
+  };
+
 
   const exportPreferences = async () => {
     setError(''); setNotice(''); setTransferringSettings(true);
@@ -209,9 +232,14 @@ function App() {
       {error && <p className="message error" role="alert">{error}</p>}
       {notice && <p className="message" role="status">{notice}</p>}
       {page === 'dashboard' && <>
-        {!installed.includes(saved.speech_model) && <div className="message onboarding">
-          <div><strong>{t('Erstes Diktat einrichten', 'Set up your first dictation')}</strong>
-            <p>{t('Lade Whisper Base unter Modelle. Beim ersten Test fragt dein System gegebenenfalls nach Mikrofonzugriff.', 'Download Whisper Base under Models. Your system may request microphone permission on the first test.')}</p></div>
+        {!saved.onboarding_complete ? <FirstRunGuide
+          settings={saved} status={status} catalog={initial.catalog}
+          globalSupported={initial.global_supported} trayAvailable={initial.tray_available}
+          saving={saving || guideSaving} canSaveProgress={!changed} t={t}
+          onNavigate={moveTo} onExecute={run} onProgress={saveGuideProgress}
+        /> : !installed.includes(saved.speech_model) && <div className="message onboarding">
+          <div><strong>{t('Sprachmodell einrichten', 'Set up your speech model')}</strong>
+            <p>{t('Dein gewähltes Modell ist nicht installiert. Lade es unter Modelle herunter oder importiere es.', 'The selected model is not installed. Download or import it under Models.')}</p></div>
           <button className="primary" onClick={() => moveTo('models')}>{t('Zu den Modellen', 'Open models')}</button>
         </div>}
         {!initial.global_supported && <p className="message">{t('Wayland: Starte hier eine Aufnahme und kopiere den fertigen Text. Globale Tasten und automatisches Einfügen sind in dieser Sitzung deaktiviert.', 'Wayland: Record here and copy the finished text. Global shortcuts and automatic insertion are disabled in this session.')}</p>}
@@ -297,6 +325,23 @@ function App() {
       </>}
       {page === 'providers' && <ProviderEditor t={t} draft={draft} update={update} />}
       {page === 'settings' && <>
+        <Section title={t('Ersteinrichtung', 'First-run setup')}>
+          <p className="muted">{saved.onboarding_complete ? t(
+            'Die Einrichtung ist abgeschlossen. Du kannst sie erneut starten, ohne Modelle oder Schlüssel zu löschen.',
+            'Setup is completed. You can restart the guide without removing models or keys.',
+          ) : t(
+            'Die Ersteinrichtung ist noch offen und kann auf der Übersicht fortgesetzt werden.',
+            'First-run setup is unfinished and can be resumed on the overview.',
+          )}</p>
+          <button type="button" disabled={saving || guideSaving || busy || changed}
+            onClick={() => void saveGuideProgress(0, false)}>
+            {t('Ersteinrichtung erneut starten', 'Restart first-run setup')}
+          </button>
+          {changed && <p className="muted small">{t(
+            'Speichere oder verwerfe Änderungen, um die Einrichtung neu zu starten.',
+            'Save or discard changes before restarting setup.',
+          )}</p>}
+        </Section>
         <Section title={t('Sprache und Mikrofon', 'Language and microphone')}>
           <div className="columns">
             <Field title={t('Oberflächensprache', 'Interface language')}><select value={draft.locale} onChange={(event) => update('locale', event.target.value as Settings['locale'])}>
