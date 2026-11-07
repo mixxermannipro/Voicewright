@@ -225,7 +225,7 @@ function App() {
       <header className="heading">
         <div><p className="kicker">{t('DIKTAT AUF DEINEM GERÄT', 'DICTATION ON YOUR DEVICE')}</p><h1>{labels[page]}</h1></div>
         <form onSubmit={save}>
-          <button className="primary" type="submit" disabled={!changed || saving || busy}>{saving ? t('Speichert …', 'Saving…') : t('Speichern', 'Save')}</button>
+          <button className="primary" type="submit" disabled={!changed || saving || guideSaving || busy}>{saving ? t('Speichert …', 'Saving…') : t('Speichern', 'Save')}</button>
         </form>
       </header>
       {changed && <p className="muted small">{t('Änderungen werden nach dem Speichern aktiv.', 'Changes take effect after saving.')}</p>}
