@@ -5,6 +5,15 @@ Falls eine Vorabversion verfügbar ist, findest du ihre Dateien in
 Die [Plattformübersicht](PLATFORM_SUPPORT.md) zeigt, welche Pakete der
 Veröffentlichungsablauf erzeugt und welche Prüfungen erforderlich sind.
 
+## Einstellungen übernehmen und wiederherstellen
+
+Die App kann Einstellungen lokal als JSON-Datei exportieren und mit
+Vorschau wieder importieren. Exportierte Dateien enthalten keine
+API-Schlüssel und keine Aufnahme; eigene Begriffe und Prompts können
+aber vertrauliche Informationen enthalten. Details zu Schema-Migration,
+Backup beschädigter Dateien und dem sicheren Wiederherstellen stehen
+unter [Einstellungs-Backup](SETTINGS_BACKUP.md).
+
 ## Für Nutzer
 
 1. Wähle ein Paket für dein Betriebssystem und deine Prozessorart. Vergleiche
