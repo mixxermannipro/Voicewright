@@ -2,7 +2,8 @@
 # GitHub führt den PR selbst zusammen, sobald der Pflicht-Check "check" grün ist.
 # Bewusst KEIN checkout des PR-Codes: Der Workflow fragt nur Metadaten über
 # die GitHub-API ab (dependabot/fetch-metadata ebenfalls nur API) und ruft
-# `gh pr merge --auto` auf.
+# `gh pr merge --auto --repo` auf. --repo ist nötig, damit gh keine
+# Git-Befehle ausführt (es gibt hier kein Git-Repository).
 # Umfang: eigene PRs und Dependabot-PRs (nur minor/patch, nie major/security).
 name: Auto merge
 
@@ -29,6 +30,8 @@ jobs:
         github.event.pull_request.user.login == 'dependabot[bot]'
       )
     env:
+      REPO_OWNER: mixxermannipro
+      REPO_NAME: Voicewright
       PR_NUMBER: ${{ github.event.pull_request.number }}
     steps:
       - name: Fetch Dependabot metadata
@@ -53,5 +56,5 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh pr merge "$PR_NUMBER" --auto --squash --delete-branch
+          gh pr merge "$PR_NUMBER" --repo "${REPO_OWNER}/${REPO_NAME}" --auto --squash --delete-branch
           echo "Auto-Merge ist aktiv. GitHub führt den PR zusammen, sobald der Pflicht-Check 'check' grün ist."
