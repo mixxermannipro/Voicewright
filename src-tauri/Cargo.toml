@@ -9,7 +9,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 arboard = { version = "3.6", default-features = false, features = ["wayland-data-control"] }
-cpal = "0.17"
+cpal = "0.18"
 enigo = "0.6.1"
 keyring = { version = "3", default-features = false, features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust", "vendored"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
