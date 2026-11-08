@@ -50,20 +50,29 @@ sind aktuell ausdrücklich **nicht durchgeführt**.
 ## Gesprochene Textbefehle: Regression und reale Abnahme (Issue #34)
 
 Die neue Einstellung `spoken_formatting` ist **standardmäßig aus**.
-Die Pure-Rust-Tests in `src-tauri/src/spoken_format.rs` sind angelegt;
-sie wurden hier **nicht ausgeführt**. Später mindestens prüfen:
 
-- DE: `Hallo komma Welt ausrufezeichen neuer Absatz München punkt`
-  ergibt `Hallo, Welt!` plus Leerzeile plus `München.`.
-- EN/mixed: `Hello comma Welt new line Grüße full stop`.
-- Zitate und Code: `"neue Zeile"` oder ein Backtick-Codeblock
-  werden nicht als Steuerwörter interpretiert.
-- `Literalmodus an ... Literalmodus aus` schützt Satzzeichenwörter;
-  ausgeschalteter Modus gibt den Originaltext unverändert aus.
-- `Punktland`, Zahlen, Datumsangaben, Dialektwörter,
-  Wiederholungen und unbekannte Phrasen bleiben erhalten.
-- Keine OS-Aktionen durch Worte wie `Enter`, `alles löschen`
-  oder `sudo`; der Parser darf nur den Textbuffer verändern.
+**Am 8. November 2026 ausgeführt und bestanden (Linux x64):**
+
+- 22 Pure-Rust-Tests: die Unit-Tests in `src-tauri/src/spoken_format.rs`
+  plus 16 Golden-Tests in `src-tauri/tests/spoken_format_golden.rs`.
+  Gedeckt sind: DE-Sätze wie `Hallo komma Welt ausrufezeichen neuer
+  Absatz München punkt` (ergibt `Hallo, Welt!` plus Leerzeile plus
+  `München.`), EN/mixed-Sätze, Zitate und Backtick-Code als geschützt,
+  `Literalmodus an … Literalmodus aus`, byte-identischer Aus-Zustand,
+  `Punktland` und Wortgrenzen, Zahlen, Datumsangaben, Dialektwörter,
+  Wiederholungen, Eigennamen, Umlaute und ß sowie unbekannte Phrasen.
+  Keine OS-Aktionen durch Worte wie `Enter`, `alles löschen` oder
+  `sudo`; der Parser verändert nur den Textpuffer.
+- Beide Modelltests mit echten, lokal geprüften Gewichten
+  ([Modelltests mit echten Gewichten](#modelltests-mit-echten-gewichten)):
+  der Whisper-Base-Sprechtest erkannte die künstlichen DE/EN-Aufnahmen,
+  der Cleanup-Protokolltest lief mit Qwen3-0.6B-Q8_0.
+
+Die Einstellungen werden pro Aufnahme-Sitzung am Beginn festgefasst;
+ein Wechsel während der Aufnahme wirkt erst auf die nächste Sitzung.
+
+Später auf echten Plattformen mindestens prüfen:
+
 - Reale Diktate unter Windows, macOS, Linux und mit
   ausgeschalteter/lokaler/Cloud-Korrektur: überprüfen, dass die
   formatierten Texte sicher eingefügt oder kopiert werden.

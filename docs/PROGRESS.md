@@ -55,10 +55,16 @@ auf dem aktiven Sitzungs-Snapshot statt. Die
 [Benutzeranleitung](SPOKEN_FORMATTING.md) dokumentiert Vokabular
 und Grenzen. Zahlen/Datum werden nicht umgerechnet.
 
-**Teststatus:** Pure-Rust-Unit-Tests wurden hinzugefügt, aber nicht
-ausgeführt; echte DE/EN-Audiotests, npm/Cargo und Plattformprüfungen
-stehen weiterhin aus. Issue #34 bleibt für reale Abnahme und
-fortgeschrittene Zahlen-/Datumsformatierung offen.
+**Teststatus:** Am 8. November 2026 ausgeführt und bestanden: 22
+Parser-Tests (6 bestehende Unit-Tests plus 16 neue Golden-Tests für
+Satzzeichen DE/EN, Zeilen und Absätze, Zahlen, Daten, Umlaute und ß,
+Dialekt, Wiederholungen, Wortgrenzen, Eigennamen, Zitate, Code,
+Literalmodus, byte-identischer Aus-Zustand und keine OS-Aktionen) sowie
+beide Pipeline-Tests mit echten, lokal geprüften Gewichten
+(Whisper-Base-Sprechtest, Cleanup-Protokolltest mit Qwen3-0.6B-Q8_0).
+Issue #34 ist mit dieser Abnahme abgeschlossen. Ausstehend bleiben die
+praktische Plattformabnahme mit physischem Mikrofon und veröffentlichten
+Paketen sowie fortgeschrittene Zahlen-/Datumsformatierung.
 
 ## Ersteinrichtung (Issue #22)
 
