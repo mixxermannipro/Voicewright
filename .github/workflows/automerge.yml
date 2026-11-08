@@ -1,0 +1,93 @@
+# Auto-Merge: Führt einen Pull Request zusammen, sobald alle Prüfungen grün sind.
+# Bewusst KEIN checkout des PR-Codes: Der Workflow liest nur PR-Metadaten über
+# die GitHub-API und für Dependabot-PRs zusätzlich die Update-Typen
+# (dependabot/fetch-metadata fragt ebenfalls nur die API ab).
+# Umfang: eigene PRs und Dependabot-PRs (nur minor/patch, nie major/security).
+name: Auto merge
+
+on:
+  pull_request:
+    types: [labeled, opened, ready_for_review, synchronize]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: automerge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    if: >-
+      github.event.pull_request.merged == false &&
+      (
+        github.event.pull_request.user.login == 'mixxermannipro' ||
+        github.event.pull_request.user.login == 'dependabot[bot]'
+      )
+    env:
+      REPO_OWNER: mixxermannipro
+      REPO_NAME: Voicewright
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+    steps:
+      - name: Fetch Dependabot metadata
+        if: github.event.pull_request.user.login == 'dependabot[bot]'
+        id: metadata
+        uses: dependabot/fetch-metadata@21025c705c08248db411dc16f3619e6b5f9ea21a # v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Allow only own PRs and Dependabot minor/patch updates
+        run: |
+          if [ "${{ github.event.pull_request.user.login }}" = "dependabot[bot]" ]; then
+            update_type="${{ steps.metadata.outputs.update-type }}"
+            if [ "$update_type" != "minor" ] && [ "$update_type" != "patch" ]; then
+              echo "Nur Dependabot-Updates vom Typ minor/patch werden automatisch gemergt (vorhanden: $update_type)."
+              exit 1
+            fi
+          fi
+          echo "PR ist im Auto-Merge-Umfang."
+
+      - name: Wait until all checks pass
+        id: wait
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          state="PENDING"
+          for i in $(seq 1 50); do
+            # $owner & Co. sind GraphQL-Variablen und dürfen nicht vom Shell
+            # expandiert werden, deshalb Single Quotes (SC2016 abstellen).
+            # shellcheck disable=SC2016
+            row=$(gh api graphql \
+              -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){merged mergeable statusCheckRollup{state}}}}' \
+              -F owner="$REPO_OWNER" -F name="$REPO_NAME" -F number="$PR_NUMBER" \
+              --jq '.data.repository.pullRequest | .statusCheckRollup.state + " " + .mergeable + " " + (if .merged then "true" else "false" end)')
+            state="${row%% *}"
+            rest="${row#* }"
+            mergeable="${rest%% *}"
+            merged="${rest##* }"
+            echo "Prüfungsstand: $state (Versuch $i/50)"
+            if [ "$merged" = "true" ]; then
+              echo "Der Pull Request ist bereits zusammengeführt."
+              break
+            fi
+            if [ "$state" = "SUCCESS" ] && [ "$mergeable" = "MERGEABLE" ]; then
+              echo "ready=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            if [ "$state" = "FAILURE" ] || [ "$state" = "CANCELLED" ] || [ "$mergeable" = "CONFLICTING" ]; then
+              echo "Prüfungen sind fehlgeschlagen oder es gibt Konflikte — kein Auto-Merge."
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "Die Prüfungen waren nach der Wartezeit noch nicht fertig — kein Auto-Merge."
+
+      - name: Merge the pull request
+        if: steps.wait.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr merge "$PR_NUMBER" --squash --delete-branch
