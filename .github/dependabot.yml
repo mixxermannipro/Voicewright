@@ -1,5 +1,7 @@
-# Wöchentliche Abhängigkeits-Updates. Die ersten Dependabot-PRs erscheinen
-# erst nach dem Merge dieser Datei (Sonntag Nacht bis Montag früh).
+# Wöchentliche Abhängigkeits-Updates, nur minor/patch.
+# Major-Updates werden ignoriert und manuell geprüft.
+# Hinweis: groups.update-types gruppiert nur zusammen — die echte
+# Beschränkung auf minor/patch kommt über die ignore-Regeln.
 version: 2
 updates:
   - package-ecosystem: "npm"
@@ -12,6 +14,9 @@ updates:
     groups:
       npm-minor-patch:
         update-types: ["minor", "patch"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     open-pull-requests-limit: 3
     labels:
       - dependencies
@@ -28,6 +33,9 @@ updates:
     groups:
       cargo-main-minor-patch:
         update-types: ["minor", "patch"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     open-pull-requests-limit: 3
     labels:
       - dependencies
@@ -44,6 +52,9 @@ updates:
     groups:
       cargo-cleanup-minor-patch:
         update-types: ["minor", "patch"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     open-pull-requests-limit: 3
     labels:
       - dependencies
@@ -60,6 +71,9 @@ updates:
     groups:
       actions-minor-patch:
         update-types: ["minor", "patch"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     open-pull-requests-limit: 3
     labels:
       - dependencies
