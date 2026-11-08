@@ -14,7 +14,34 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
+  web:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Check the interface
+        run: |
+          npm ci
+          npm run check
+          npm run lint
+          npm test
+          npm run build
+
+      # Nicht blockierend: npm-Meldungen dürfen fremde PRs nicht stoppen.
+      # Das wöchentliche Audit in audit.yml ist die Pflichtprüfung.
+      - name: Audit npm dependencies (non-blocking)
+        continue-on-error: true
+        run: npm audit --audit-level=high
+
+  rust:
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     env:
@@ -27,7 +54,6 @@ jobs:
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: '24'
-          cache: npm
 
       - name: Install Linux build dependencies
         run: |
@@ -46,26 +72,17 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            ~/.cargo/bin/cargo-audit
             src-tauri/target
             engines/cleanup/target
           key: ci-rust-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust-toolchain.toml', '**/Cargo.lock', '.github/workflows/ci.yml') }}
 
-      - name: Check the interface
-        run: |
-          npm ci
-          npm run check
-          npm run lint
-          npm test
-          npm run build
+      - name: Build the cleanup engine
+        run: npm run prepare:engine -- x86_64-unknown-linux-gnu
 
       - name: Check formatting
         run: |
           cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
           cargo fmt --manifest-path engines/cleanup/Cargo.toml --all -- --check
-
-      - name: Build the cleanup engine
-        run: npm run prepare:engine -- x86_64-unknown-linux-gnu
 
       - name: Check and test the native code
         run: |
@@ -74,9 +91,51 @@ jobs:
           cargo clippy --manifest-path engines/cleanup/Cargo.toml --locked --all-targets -- -D warnings
           cargo test --manifest-path engines/cleanup/Cargo.toml --locked
 
-      - name: Audit dependencies
+  workflows:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      # Version und Prüfsumme fest eingezeichnet; die Datei kommt nur
+      # aus dem offiziellen rhysd/actionlint-Release.
+      - name: Install actionlint 1.7.12 (checksum-verified)
         run: |
-          npm audit --audit-level=high
-          cargo install cargo-audit --version 0.22.2 --locked
-          cargo audit --file src-tauri/Cargo.lock
-          cargo audit --file engines/cleanup/Cargo.lock
+          curl -fsSL -o actionlint.tar.gz \
+            "https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz"
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  actionlint.tar.gz" | sha256sum --check -
+          tar xzf actionlint.tar.gz
+          sudo mv actionlint /usr/local/bin/
+
+      - name: Lint the workflow files
+        run: actionlint
+
+  # Pflicht-Check für den Branch-Schutz. Der Job läuft immer und schlägt
+  # fehl, wenn nicht alle benötigten Jobs erfolgreich waren.
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    needs: [web, rust, workflows]
+    if: always()
+    steps:
+      - name: Fail unless every needed job succeeded
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+
+          needs = json.loads(os.environ["NEEDS"])
+          failed = [
+              f"{name}: {info.get('result')}"
+              for name, info in needs.items()
+              if info.get("result") != "success"
+          ]
+          if failed:
+              sys.exit("Required jobs did not all succeed: " + ", ".join(failed))
+          print("All required jobs succeeded.")
+          PY
