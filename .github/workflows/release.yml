@@ -173,6 +173,6 @@ jobs:
           sha256sum -- "${installers[@]}" > SHA256SUMS.txt
           sha256sum --check SHA256SUMS.txt
 
-          printf 'Automatisch gebaute Vorabversion. Die Pakete sind nicht mit Herstellerzertifikaten signiert.\n\nQuellstand: `%s`\n\nDie Datei SHA256SUMS.txt enthält die Prüfsummen der Installationsdateien.\n' "$SOURCE_SHA" > ../release-notes.md
+          printf 'Automatisch gebaute Vorabversion. Die Pakete sind nicht mit Herstellerzertifikaten signiert.\n\nQuellstand: %s\n\nDie Datei SHA256SUMS.txt enthält die Prüfsummen der Installationsdateien.\n' "$SOURCE_SHA" > ../release-notes.md
           gh release create "$RELEASE_TAG" "${installers[@]}" SHA256SUMS.txt \
             --verify-tag --prerelease --title "$RELEASE_TAG" --notes-file ../release-notes.md
