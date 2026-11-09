@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" role="img" aria-label="Voicewright General Dark Mode UX design reference">
+<defs><linearGradient id="wall" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#101328"/><stop offset="55%" stop-color="#14182b"/><stop offset="100%" stop-color="#262357"/></linearGradient><filter id="winShadow" x="-20%" y="-30%" width="150%" height="170%"><feDropShadow dx="0" dy="20" stdDeviation="30" flood-color="#000000" flood-opacity=".42"/></filter></defs>
+<rect x="0" y="0" width="1440" height="900" rx="0" fill="url(#wall)" stroke="none" stroke-width="1"/>
+<path d="M0,760 C350,690 620,905 1020,590 S1310,320 1440,445" fill="none" stroke="#4b4b9e" stroke-width="90" opacity=".20"/>
+<rect x="125" y="83" width="1185" height="730" rx="28" fill="#0d0e13" stroke="#30323d" stroke-width="1"/>
+<path d="M388 83 V813" stroke="#30323d" stroke-width="1"/>
+<rect x="127" y="85" width="260" height="726" rx="26" fill="#13151c" stroke="none" stroke-width="1"/>
+<circle cx="156" cy="112" r="9" fill="#fb645c"/><circle cx="184" cy="112" r="9" fill="#f7bd49"/><circle cx="212" cy="112" r="9" fill="#4ac96c"/>
+<rect x="159" y="168" width="44" height="44" rx="12" fill="#312c55" stroke="none" stroke-width="1"/>
+<rect x="169" y="181" width="3" height="8" rx="2" fill="#c0b9ff" stroke="none" stroke-width="1"/>
+<rect x="175" y="177.5" width="3" height="15" rx="2" fill="#c0b9ff" stroke="none" stroke-width="1"/>
+<rect x="181" y="174" width="3" height="22" rx="2" fill="#c0b9ff" stroke="none" stroke-width="1"/>
+<rect x="187" y="177.5" width="3" height="15" rx="2" fill="#c0b9ff" stroke="none" stroke-width="1"/>
+<rect x="193" y="181" width="3" height="8" rx="2" fill="#c0b9ff" stroke="none" stroke-width="1"/>
+<text x="215" y="197" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Arial,sans-serif" font-size="23" font-weight="730" fill="#f4f4f7" text-anchor="start">Voicewright</text>
+<text x="160" y="242" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Arial,sans-serif" font-size="11" font-weight="700" fill="#7d8295" text-anchor="start">SETTINGS</text>
+<rect x="145" y="265" width="224" height="47" rx="14" fill="#27243c" stroke="none" stroke-width="1"/>
+<rect x="145" y="265" width="4" height="47" rx="2" fill="#9a8dff" stroke="none" stroke-width="1"/>
+<text x="170" y="295" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Arial,sans-serif" font-size="20" font-weight="450" fill="#9a8dff" text-anchor="start">◎</text>
+<text x="208" y="295" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Arial,sans-serif" font-size="18" font-weight="650" fill="#f4f4f7" text-anchor="start">General</text>
+<text x="170" y="354" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Arial,sans-serif" font-size="20" font-weight="450" fill="#b3b5c3" text-anchor="start">◉</text>
+<text x="208" y="354" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Arial,sans-serif" font-size="18" font-weight="480" fill="#b3b5c3" text-anchor="start">Dictation</text>
+<text x="170" y="413" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Arial,sans-serif" font-size="20" font-weight="450" fill="#b3b5c3" text-anchor="start">▤</text>
+<text x="208" y="413" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Arial,sans-serif" font-size="18" font-weight="480" fill="#b3b5c3" text-anchor="start">Models</text>
+<text x="170" y="472" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Arial,sans-serif" font-size="20" font-weight="450" fill="#b3b5c3" text-anchor="start">⌘</text>
+<text x="208" y="472" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Arial,sans-serif" font-size="18" font-weight="480" fill="#b3b5c3" text-anchor="start">Shortcuts</text>
+<text x="170" y="531" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Arial,sans-serif" font-size="20" font-weight="450" fill="#b3b5c3" text-anchor="start">◇</text>
+<text x="208" y="531" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Arial,sans-serif" font-size="18" font-weight="480" fill="#b3b5c3" text-anchor="start">Privacy</text>
+<path d="M155 583 L361 583" stroke="#30313a" stroke-width="1"/>
+<text x="161" y="618" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Arial,sans-serif" font-size="13" font-weight="400" fill="#7d8295" text-anchor="start">Runs quietly in the background</text>
+<circle cx="166" cy="647" r="5" fill="#65dba5"/>
+<text x="180" y="653" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Arial,sans-serif" font-size="14" font-weight="580" fill="#b3b5c3" text-anchor="start">Ready</text>
+<text x="422" y="175" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Arial,sans-serif" font-size="36" font-weight="750" fill="#f4f4f7" text-anchor="start">General</text>
+<text x="423" y="211" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Arial,sans-serif" font-size="16" font-weight="400" fill="#b3b5c3" text-anchor="start">Background dictation, always one shortcut away.</text>
+<rect x="421" y="242" width="772" height="185" rx="19" fill="#191b22" stroke="#30323d" stroke-width="1"/>
+<text x="447" y="279" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Arial,sans-serif" font-size="21" font-weight="650" fill="#f4f4f7" text-anchor="start">Background</text>
+<text x="463" y="317" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Arial,sans-serif" font-size="18" font-weight="560" fill="#f4f4f7" text-anchor="start">Run in background</text>
+<text x="463" y="341" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Arial,sans-serif" font-size="14" font-weight="400" fill="#b3b5c3" text-anchor="start">Ready for the shortcut, without an open window.</text>
+<rect x="1095" y="289" width="51" height="28" rx="14" fill="#9a8dff" stroke="none" stroke-width="1"/>
+<circle cx="1131" cy="303" r="10" fill="#0d0e13"/>
+<path d="M449 348 L1165 348" stroke="#30313a" stroke-width="1"/>
+<text x="463" y="388" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Arial,sans-serif" font-size="18" font-weight="560" fill="#f4f4f7" text-anchor="start">Launch at login</text>
+<text x="463" y="412" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Arial,sans-serif" font-size="14" font-weight="400" fill="#b3b5c3" text-anchor="start">Start quietly in the menu bar or system tray.</text>
+<rect x="1095" y="360" width="51" height="28" rx="14" fill="#9a8dff" stroke="none" stroke-width="1"/>
+<circle cx="1131" cy="374" r="10" fill="#0d0e13"/>
+<rect x="421" y="447" width="772" height="149" rx="19" fill="#191b22" stroke="#30323d" stroke-width="1"/>
+<text x="447" y="484" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Arial,sans-serif" font-size="21" font-weight="650" fill="#f4f4f7" text-anchor="start">Appearance</text>
+<text x="463" y="522" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Arial,sans-serif" font-size="18" font-weight="560" fill="#f4f4f7" text-anchor="start">Theme</text>
+<text x="463" y="546" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Arial,sans-serif" font-size="14" font-weight="400" fill="#b3b5c3" text-anchor="start">Follow the system or choose a theme.</text>
+<rect x="867" y="493" width="84" height="36" rx="13" fill="#27243c" stroke="#9a8dff" stroke-width="1"/>
+<text x="909" y="517" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Arial,sans-serif" font-size="15" font-weight="600" fill="#f4f4f7" text-anchor="middle">Auto</text>
+<rect x="957" y="493" width="84" height="36" rx="13" fill="#2a2c37" stroke="#30323d" stroke-width="1"/>
+<text x="999" y="517" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Arial,sans-serif" font-size="15" font-weight="500" fill="#b3b5c3" text-anchor="middle">Light</text>
+<rect x="1047" y="493" width="84" height="36" rx="13" fill="#2a2c37" stroke="#30323d" stroke-width="1"/>
+<text x="1089" y="517" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Arial,sans-serif" font-size="15" font-weight="500" fill="#b3b5c3" text-anchor="middle">Dark</text>
+<rect x="421" y="617" width="772" height="122" rx="19" fill="#191b22" stroke="#30323d" stroke-width="1"/>
+<text x="447" y="654" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Arial,sans-serif" font-size="21" font-weight="650" fill="#f4f4f7" text-anchor="start">Status</text>
+<circle cx="468" cy="693" r="6" fill="#65dba5"/>
+<text x="485" y="696" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Arial,sans-serif" font-size="19" font-weight="640" fill="#f4f4f7" text-anchor="start">Voicewright is ready</text>
+<text x="485" y="721" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Arial,sans-serif" font-size="14" font-weight="400" fill="#b3b5c3" text-anchor="start">Microphone activates only when dictation starts.</text>
+<text x="125" y="855" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Arial,sans-serif" font-size="12" font-weight="650" fill="#9996d0" text-anchor="start">VOICEWRIGHT  ·  UI CONCEPT  ·  NOV 2026</text>
+</svg>
