@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900"><defs><linearGradient id="b" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#090b14"/><stop offset="1" stop-color="#24224c"/></linearGradient><filter id="s"><feDropShadow dx="0" dy="20" stdDeviation="25" flood-opacity=".5"/></filter></defs><rect width="1440" height="900" fill="url(#b)"/><path d="M0 690 C420 820 680 480 1440 280" fill="none" stroke="#4b468b" stroke-opacity=".24" stroke-width="100"/><rect x="400" y="382" width="640" height="134" rx="36" fill="#14151c" stroke="#393648" stroke-width="2" filter="url(#s)"/><circle cx="480" cy="449" r="34" fill="#2a2648" stroke="#9989ff" stroke-width="2"/><path d="M468 453 v-12 a12 12 0 0 1 24 0 v12 a12 12 0 0 1 -24 0 m-6 0 a18 18 0 0 0 36 0 m-18 18 v10 m-10 0 h20" fill="none" stroke="#c7c1ff" stroke-width="2.5" stroke-linecap="round"/><text x="538" y="441" font-family="-apple-system,Segoe UI,Arial" font-size="27" font-weight="650" fill="#f3f3f8">Listening…</text><text x="539" y="473" font-family="-apple-system,Segoe UI,Arial" font-size="16" fill="#a2a1ae">Release the shortcut to insert text</text>
+<rect x="837" y="446" width="3.1" height="6" rx="1.6" fill="#9b8cfa" opacity=".9"/>
+<rect x="842.7" y="434" width="3.1" height="30" rx="1.6" fill="#9b8cfa" opacity=".9"/>
+<rect x="848.4" y="442" width="3.1" height="14" rx="1.6" fill="#9b8cfa" opacity=".9"/>
+<rect x="854.1" y="441.5" width="3.1" height="15" rx="1.6" fill="#9b8cfa" opacity=".9"/>
+<rect x="859.8" y="446" width="3.1" height="6" rx="1.6" fill="#9b8cfa" opacity=".9"/>
+<rect x="865.5" y="443.5" width="3.1" height="11" rx="1.6" fill="#9b8cfa" opacity=".9"/>
+<rect x="871.2" y="437" width="3.1" height="24" rx="1.6" fill="#9b8cfa" opacity=".9"/>
+<rect x="876.9" y="444" width="3.1" height="10" rx="1.6" fill="#9b8cfa" opacity=".9"/>
+<rect x="882.6" y="432.5" width="3.1" height="33" rx="1.6" fill="#9b8cfa" opacity=".9"/>
+<rect x="888.3" y="443" width="3.1" height="12" rx="1.6" fill="#9b8cfa" opacity=".9"/>
+<rect x="894" y="437" width="3.1" height="24" rx="1.6" fill="#9b8cfa" opacity=".9"/>
+<rect x="899.7" y="442.5" width="3.1" height="13" rx="1.6" fill="#9b8cfa" opacity=".9"/>
+<rect x="905.4" y="445.5" width="3.1" height="7" rx="1.6" fill="#9b8cfa" opacity=".9"/>
+<rect x="911.1" y="442" width="3.1" height="14" rx="1.6" fill="#9b8cfa" opacity=".9"/>
+<rect x="916.8" y="443" width="3.1" height="12" rx="1.6" fill="#9b8cfa" opacity=".9"/>
+<rect x="922.5" y="434" width="3.1" height="30" rx="1.6" fill="#9b8cfa" opacity=".9"/>
+<rect x="928.2" y="445" width="3.1" height="8" rx="1.6" fill="#9b8cfa" opacity=".9"/>
+<rect x="933.9" y="434" width="3.1" height="30" rx="1.6" fill="#9b8cfa" opacity=".9"/>
+<rect x="939.6" y="441.5" width="3.1" height="15" rx="1.6" fill="#9b8cfa" opacity=".9"/>
+<rect x="945.3" y="441.5" width="3.1" height="15" rx="1.6" fill="#9b8cfa" opacity=".9"/>
+<rect x="951" y="445.5" width="3.1" height="7" rx="1.6" fill="#9b8cfa" opacity=".9"/>
+<rect x="956.7" y="444" width="3.1" height="10" rx="1.6" fill="#9b8cfa" opacity=".9"/>
+<rect x="962.4" y="437.5" width="3.1" height="23" rx="1.6" fill="#9b8cfa" opacity=".9"/>
+<rect x="968.1" y="445" width="3.1" height="8" rx="1.6" fill="#9b8cfa" opacity=".9"/>
+<rect x="973.8" y="432.5" width="3.1" height="33" rx="1.6" fill="#9b8cfa" opacity=".9"/>
+<rect x="979.5" y="442" width="3.1" height="14" rx="1.6" fill="#9b8cfa" opacity=".9"/>
+<text x="720" y="582" text-anchor="middle" font-family="-apple-system,Segoe UI,Arial" font-size="17" fill="#999caf">Small, temporary, non-focusing overlay. Hidden when idle.</text></svg>
