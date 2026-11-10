@@ -54,10 +54,16 @@ Nachweis über andere Anwendungen.
 - **macOS:** *Systemeinstellungen → Datenschutz & Sicherheit → Mikrofon*.
   Der Stand der nativen globalen Einfügung wird noch entwickelt;
   der Kopierweg bleibt verfügbar.
-- **Linux X11:** Audioeingang in der Audioverwaltung prüfen; globale
-  Kürzel und Einfügung sind derzeit nur teilweise praktisch erprobt.
+- **Linux X11:** Audioeingang in der Audioverwaltung prüfen. Globale
+  Kürzel und direktes Einfügen sind vorgesehen; das Zielfenster wird vor
+  dem Tippen geprüft. Mehrzeilige Texte nutzen die Eingabetaste. Bei
+  Fokuswechsel, gehaltenen Sondertasten oder Steuerzeichen bleibt der
+  Text zum Kopieren in der App.
 - **Linux Wayland:** Aufnahme innerhalb der App und manuelles Kopieren.
-  Globale Hotkeys und automatische Texteingabe sind nicht zugesichert.
+  Globale Hotkeys laufen über das XDG-GlobalShortcuts-Portal, wenn dein
+  Desktop es anbietet und du die Freigabe bestätigst. Automatische
+  Texteingabe ist unter Wayland bewusst nicht verfügbar. Ohne Freigabe
+  oder ohne Portal bleibt der Weg über das App-Fenster.
 
 Das Statusbereichs-/Tray-Symbol wird nur angezeigt, wenn das System es
 bereitstellt. Autostart wird durch diese Anleitung **nicht** aktiviert;
@@ -103,8 +109,10 @@ restart from **Settings → First-run setup**.
 For microphone permissions, check **Windows Settings → Privacy & security
 → Microphone** or **macOS System Settings → Privacy & Security →
 Microphone**. On Linux, choose an input source in the desktop audio
-controls. Wayland requires app-based recording and manual copying in
-the current implementation.
+controls. X11 supports global shortcuts and direct insertion with a
+target-window check. Wayland uses the XDG GlobalShortcuts portal when the
+desktop provides it and you approve the request; automatic insertion is
+deliberately unavailable there, so use the app window and **Copy**.
 
 Finishing the guide is a user acknowledgement, **not an automated
 cross-application or multi-platform test**. The tray icon may be absent,

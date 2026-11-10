@@ -12,6 +12,49 @@ werden weiterhin gelesen; beim nächsten Speichern werden sie unter dem neuen
 Dienstnamen abgelegt. Für diese Version gibt es noch kein veröffentlichtes
 Installationspaket.
 
+## Linux: X11-Härtung und Wayland-Portale (Issue #6)
+
+Die Linux-Anbindung trennt globale Tasten und Texteingabe jetzt sauber:
+
+- **X11:** Das Zielfenster wird über Fokus-Fenster, aktives Fenster,
+  Prozesskennung, Sichtbarkeit und gehaltene Sondertasten geprüft. Die
+  Prüfung läuft vor dem Tippen und vor jedem Graphem-Block. Mehrzeilige
+  Ergebnisse werden mit der Eingabetaste eingefügt; CRLF/CR wird zu LF.
+  Steuerzeichen außer Zeilenumbruch, leerer Text und mehr als 400 Zeichen
+  bleiben beim Kopieren. Emoji, Flaggen, Familien-Emoji und kombinierte
+  Zeichen werden nicht zerteilt.
+- **Wayland:** Globale Tasten laufen über das XDG-Desktop-Portal
+  `GlobalShortcuts`, wenn es vorhanden ist und der Nutzer die Freigabe
+  erteilt. Die Oberfläche zeigt `pending`, `active`, `denied`,
+  `unavailable` oder `error` und bietet bei Ablehnung eine erneute Anfrage.
+  Automatisches Einfügen bleibt bewusst aus; der Text bleibt in der App
+  und wird nur auf ausdrücklichen Klick kopiert.
+- **Keine Umgehungen:** kein Root, `uinput`, `sudo`, Keylogging oder
+  pauschales `Input`-/`RemoteDesktop`-Portal. Die Zwischenablage wird
+  nicht im Hintergrund verändert.
+
+**Geprüft am 10. November 2026 (Linux x64, dieser Branch):**
+
+- `npm run check`, `npm run lint`, `npm test` (6 Tests) und
+  `npm run build` bestanden.
+- `cargo fmt --check`, `cargo clippy --locked --all-targets -- -D warnings`
+  und `cargo test --locked` bestanden: 56 Unit-Tests plus 22 Golden-Tests,
+  darunter neue Tests für Sitzungserkennung, Graphem-Chunking, Steuerzeichen,
+  Portal-Trigger und Portal-Zustände.
+- Der echte X11-Einfügetest mit Xvfb und einem GTK-TextView bestand:
+  deutscher Text mit Umlauten, ß, Emoji, Flagge, Familien-Emoji,
+  Gedankenstrich und zwei Absätzen kam exakt an
+  (`scripts/linux-smoke/x11-insertion.sh`).
+- Auf der KDE-Plasma-Wayland-Sitzung dieser Umgebung meldet das Portal
+  Version 2. Sitzung anlegen und schließen über `ashpd` bestanden. Der
+  Freigabedialog und eine echte Tastenbindung wurden nicht automatisiert.
+
+**Noch offen:** echte Freigabe und Tastenbindung auf GNOME Wayland, KDE
+Plasma Wayland und wlroots, Qt und Browser unter X11, XWayland sowie ein
+vollständiger DEB-Durchlauf mit diesem Branch. Die Ergebnisse stehen in
+[PLATFORM_SUPPORT.md](PLATFORM_SUPPORT.md); die manuellen Schritte in
+[TESTING.md](TESTING.md).
+
 ## Prompt-Härtung – Implementierung in Issue #17
 
 Auf einem separaten Feature-Branch liegt eine erweiterte Standardanweisung,
@@ -93,7 +136,7 @@ Issue #22 bleibt bis zur plattformspezifischen Abnahme offen.
 - Lokale Whisper-Erkennung auf der CPU. Der Katalog enthält die mehrsprachigen Modelle Tiny, Base, Small, Medium, Large-v3 und Large-v3 Turbo. Downloads verwenden feste Modellversionen, Größen und SHA-256-Prüfsummen. Es gibt Abbruch, Fortsetzen, Löschen und Import. Beim Import prüft die App Formatkennung, GGUF-Version und Grundstruktur; vertauschte Formate sowie beschädigte oder unvollständige Dateien werden abgelehnt. Nur Whisper Base ist praktisch getestet.
 - Lokale Textkorrektur mit mitgeliefertem llama.cpp-Programm und Qwen3-0.6B-Q8_0. Eigene dichte Qwen3-GGUF-Modelle können importiert werden. Anweisungen, Vorlagen, Wörterliste und Ziel für Übersetzung sind einstellbar. Bei Fehlern bleibt der Originaltext verfügbar.
 - Optionale Cloud-Korrektur mit OpenAI, Gemini, Anthropic, xAI, OpenRouter, Mistral, Groq, DeepSeek, Together AI, Fireworks, Cerebras und eigenen kompatiblen Servern. Die App sendet Text nur im aktivierten Cloud-Modus. Schlüssel werden im Passwortspeicher des Betriebssystems abgelegt.
-- Direkte Texteingabe unter Windows und X11 mit Prüfung des Zielfensters. Bei abweichendem Fokus oder gehaltenen Sondertasten bleibt der Text zum Kopieren in der App. Automatisches Tippen bleibt auf kurze einzeilige Texte beschränkt. macOS nutzt Kopieren. Wayland kann über die App aufnehmen und kopieren.
+- Direkte Texteingabe unter Windows und X11 mit Prüfung des Zielfensters. Bei abweichendem Fokus, gehaltenen Sondertasten, Steuerzeichen außer Zeilenumbruch oder mehr als 400 Zeichen bleibt der Text zum Kopieren in der App. Mehrzeilige Texte werden unter X11 mit der Eingabetaste eingefügt; Emoji und kombinierte Zeichen werden nicht zerteilt. macOS nutzt Kopieren. Unter Wayland laufen globale Tasten über das XDG-GlobalShortcuts-Portal, sofern der Desktop es anbietet und der Nutzer zustimmt; automatisches Einfügen bleibt dort aus, der Text ist über die App kopierbar.
 - Vollständige [Vorlagen für die GitHub-Automatisierung](github-workflows/README.md). GitHub hat das Schreiben nach `.github/workflows/` abgelehnt, da der verwendeten Anmeldung die Berechtigung `workflow` fehlt. Die Dateien bleiben unter `docs/github-workflows/` gesichert, bis ein Token mit dieser Berechtigung verfügbar ist.
 
 ## Geprüft am 6. November 2026
@@ -112,8 +155,10 @@ Issue #22 bleibt bis zur plattformspezifischen Abnahme offen.
 | RustSec | Beide Abhängigkeitslisten gescannt. Keine als Schwachstelle eingestuften Treffer. App-Liste mit 8 Warnungen zu nicht gepflegten Bibliotheken und einer unsicheren GLib-Schnittstelle in dieser Warnungszahl. Engine-Liste ohne Warnung. Warnungen vor Freigabe bewerten. |
 
 Der virtuelle Linux-Test verwendet künstliche Eingabe und kein physisches
-Mikrofon. Windows, macOS und Linux Wayland wurden praktisch noch nicht
-geprüft. NSIS, DMG und AppImage sind noch nicht gebaut. Die aktuelle
+Mikrofon. Windows, macOS und Linux Wayland wurden nicht vollständig
+praktisch geprüft; auf KDE Wayland wurde am 10. November 2026 nur die
+Portal-Sitzung angelegt und geschlossen, nicht die Tastenfreigabe. NSIS,
+DMG und AppImage sind noch nicht gebaut. Die aktuelle
 x64-Build-Konfiguration der lokalen Korrektur verwendet AVX2 und verwandte
 Prozessorfunktionen. Ein Starttest auf älteren Prozessoren fehlt. Die
 Hotkey-Zustandsmaschine ist durch Unit-Tests abgedeckt; echte Tastaturtests
@@ -123,7 +168,7 @@ auf Windows, macOS und X11 sowie Sleep/Wake- und RDP-Tests stehen aus.
 
 1. **Prüfungen auf GitHub aktivieren.** Folge [github-workflows/README.md](github-workflows/README.md). Prüfe den Änderungsvorschlag auf Ubuntu und baue NSIS, DMG und AppImage. Prüfe, ob jedes Paket das Korrekturprogramm und alle nötigen Systembibliotheken enthält. Das lokale DEB ist ein Debug-Testpaket. Die Erstfreigabe braucht einen optimierten Paketbau.
 2. **Echte Desktop-Tests nachholen.** Prüfe physisches Mikrofon, Gerätewechsel und Trennung, Tastenkürzel und Abbruch während jeder Phase, Fokuswechsel, Sonderzeichen, Kopieren, Statussymbol bei geschlossenem Fenster und Installationsstart. Prüfe Passwortspeicher und Anbieter freiwillig mit eigenen Testschlüsseln. Wiederhole den automatisierten [Linux-Test](TESTING.md) mit dem endgültigen Paket.
-3. **Einfügen und Wayland ergänzen.** Baue die macOS-Zugriffshilfe zur Prüfung des fokussierten Elements und zur Texteingabe. Prüfe das Desktop-Portal für Wayland-Tastenkürzel. Unterstütze mehrzeiligen Text nur mit sicherer, bestätigter Einfügung und Erhalt von Bild- und Textdaten in der Zwischenablage. Die aktuelle X11-Prüfung kennt das Fenster. Sie kann Wechsel zwischen Feldern derselben App nicht zuverlässig erkennen.
+3. **Einfügen und Wayland praktisch abnehmen.** Die Portal-Anbindung und das mehrzeilige X11-Einfügen sind implementiert. Prüfe jetzt die echte Freigabe und Tastenbindung auf GNOME Wayland, KDE Plasma Wayland und wlroots, außerdem Qt und Browser unter X11 sowie XWayland. Die X11-Prüfung kennt Fensterwechsel, aber nicht zuverlässig einen Feldwechsel innerhalb desselben Fensters; Passwortfelder bleiben ein Restrisiko. Baue zusätzlich die macOS-Zugriffshilfe für fokussierte Elemente und Texteingabe. Prüfe beim Kopieren den Erhalt von Bild- und Textdaten in der Zwischenablage.
 4. **Modelle und Leistung vervollständigen.** Prüfe echte Downloads inklusive Unterbrechung, Bereichsantwort, Prüfsummenfehler und freien Speicher. Ergänze bessere Stille-Erkennung, robustere Modellimport-Prüfung, Parakeet V3 mit geprüftem sherpa-onnx-Modell, GPU-Erkennung und Beschleunigung mit CPU-Rückfall. Teste portable x64-Builds auf älteren CPUs. Dokumentiere Ende-zu-Ende-Zeiten, Spitzen-RAM und GPU-Verhalten auf echter Hardware.
 5. **Restliche Bedienung und Veröffentlichung.** Ergänze Systemstart, optionale Audiosignale und Diagnose. Manche System- und Anbieterfehler sind nur einsprachig. Prüfe die Lizenzhinweise der tatsächlich ausgelieferten Bibliotheken und RustSec-Warnungen. Führe den Arbeitszweig mit `main` zusammen, wenn die Prüfungen passen. Folge dann [RELEASE.md](RELEASE.md). Signierung, macOS-Notarisierung und authentifizierte Updates sind offen.
 

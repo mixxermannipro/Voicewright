@@ -189,6 +189,97 @@ Prüfprotokoll: Datum, Betriebssystem, CPU/RAM, Modell/Version,
 Sprachmodus, Original, Ergebnis, erfüllte/verletzte Invarianten und Zeit.
 Ohne diese realen Modellläufe ist das Issue nicht vollständig abgenommen.
 
+## Linux: X11-Einfügen und Wayland-Portale (Issue #6)
+
+### Automatisiert
+
+Die Standardprüfungen decken die neue Logik teilweise ab:
+
+```sh
+cargo test --manifest-path src-tauri/Cargo.toml --locked
+cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings
+```
+
+Enthalten sind Tests für die Sitzungserkennung (X11, Wayland, XWayland,
+fehlende Variablen), Graphem-Chunking, Emoji und kombinierte Zeichen,
+Zeilenumbrüche, CRLF-Normalisierung, Steuerzeichen, die 400-Zeichen-Grenze,
+Portal-Trigger und die Portal-Zustände. Diese Tests ersetzen keinen echten
+Fenster- oder Portaltest.
+
+### X11-Integrationstest mit GTK
+
+`scripts/linux-smoke/x11-insertion.sh` startet einen privaten Xvfb-Bildschirm,
+fokussiert ein GTK-TextView und lässt das echte Einfüge-Modul einen Text mit
+Umlauten, ß, Emoji, Flagge, Familien-Emoji, Gedankenstrich und zwei Absätzen
+tippen. Der Test vergleicht den Inhalt exakt. Er läuft nur in einem
+isolierten Linux-Container mit Rust, GTK-3-Entwicklungspaketen, Xvfb,
+xdotool und einem C-Compiler; das `voxtakt-build`-Image erfüllt das.
+
+```sh
+podman run --rm -v "$PWD":/work:Z -w /work localhost/voxtakt-build:latest \
+  bash -lc 'export PATH=/usr/local/cargo/bin:$PATH; ./scripts/linux-smoke/x11-insertion.sh'
+```
+
+Der Test verwendet eine private Anzeige und niemals den Bildschirm des
+Aufrufers. Er prüft GTK, nicht Qt oder einen Browser.
+
+### Wayland: manuelle Portal-Matrix
+
+Auf einem echten Wayland-Desktop mindestens prüfen:
+
+| Umgebung | Portal vorhanden | Freigabe erteilt | Kürzel außerhalb des Fensters | Automatisches Einfügen | Kopieren |
+| --- | --- | --- | --- | --- | --- |
+| GNOME Wayland | | | | muss aus sein | |
+| KDE Plasma Wayland | | | | muss aus sein | |
+| wlroots (Sway/Hyprland) | | | | muss aus sein | |
+
+1. App starten. Die Oberfläche muss `Freigabe ausstehend` zeigen, solange
+   der Portal-Dialog offen ist. Der Dialog muss den Namen Voicewright und
+   die Diktattaste nennen.
+2. Freigabe erteilen: Zustand wird `aktiv`; die Diktattaste startet und
+   stoppt ein Diktat auch außerhalb des Fensters. Die Abbruchtaste nur
+   prüfen, wenn sie in den Einstellungen gesetzt ist.
+3. Freigabe ablehnen: Zustand wird `abgelehnt`; die App bleibt über das
+   Fenster bedienbar; „Freigabe erneut anfragen“ öffnet den Dialog erneut.
+4. Portal beenden oder Sitzung schließen: Zustand wird `nicht verfügbar`;
+   ein neuer Versuch über die Einstellungen oder den Knopf startet die
+   Anfrage erneut.
+5. Tasten in den Einstellungen ändern und speichern: Die Portal-Sitzung
+   wird neu angefragt; die alte Bindung darf nicht weiterlaufen.
+6. Ein Diktat außerhalb des Fensters beenden: Der Text muss in Voicewright
+   erscheinen. Automatisches Einfügen darf nicht stattfinden; die
+   Zwischenablage darf sich ohne Klick nicht ändern. „Kopieren“ muss den
+   vollständigen Text übernehmen.
+7. Einen Text mit Emoji, Absatz und Umlauten diktieren: Der Text muss
+   vollständig in der App bleiben, auch wenn das Einfügen verboten ist.
+
+### X11: manuelle Matrix
+
+Zusätzlich zum automatischen GTK-Test auf einem echten X11-Desktop prüfen:
+
+- GTK, Qt und ein Browser-Textfeld mit deutschem Text, Emoji und mindestens
+  zwei Absätzen.
+- Fokuswechsel während der Verarbeitung: Es darf kein Text in das falsche
+  Fenster gehen; der vollständige Text bleibt in der App.
+- Zwei Felder derselben Anwendung: Der Wechsel ist nicht in jedem Fall
+  erkennbar. Dokumentiere, ob Text im alten Feld landet; das ist eine
+  bekannte Grenze.
+- Gehaltene Sondertaste (Shift, Strg, Alt, Super, AltGr): Es darf nicht
+  getippt werden.
+- Text mit Tabulator oder Nullbyte: Nur Kopieren, kein Tippen.
+- Mehr als 400 Zeichen: Nur Kopieren, kein Tippen.
+- Zwischenablage mit Bild und Text vor dem Diktat: Sie darf durch das
+  automatische Einfügen nicht verändert werden.
+- XWayland in einer Wayland-Sitzung: Die App muss den Kopierweg nehmen und
+  darf nicht über X11 tippen.
+
+### Protokoll
+
+Notiere Datum, Distribution, Desktop, Display-Server, Portalversion,
+App-Version, ob die Freigabe erteilt oder abgelehnt wurde, das
+Ergebnis pro Textfeld und ob die Zwischenablage unverändert blieb. Ohne
+diese Angaben ist ein „funktioniert“ nicht nachvollziehbar.
+
 ## Praktischer Durchlauf pro Plattform
 
 1. Installiere das veröffentlichte Paket. Starte die App erstmals und gib
