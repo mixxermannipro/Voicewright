@@ -210,6 +210,13 @@ function App() {
   const phase = status?.phase ?? 'idle';
   const download = status?.download;
   const showTray = initial.tray_available;
+  const shortcutLabel = status?.shortcut_active
+    ? <><kbd>{saved.shortcut}</kbd> · {saved.recording_mode === 'hold' ? t('Halten', 'Hold') : t('Umschalten', 'Toggle')}</>
+    : status?.shortcut_state === 'pending' ? t('Freigabe ausstehend', 'Awaiting approval')
+      : status?.shortcut_state === 'denied' ? t('Abgelehnt', 'Denied')
+        : status?.shortcut_state === 'unavailable' ? t('Nicht verfügbar', 'Unavailable')
+          : status?.shortcut_state === 'error' ? t('Fehler', 'Error')
+            : t('Nicht aktiv', 'Inactive');
 
   return <div className="shell">
     <a className="skip" href="#content">{t('Zum Inhalt', 'Skip to content')}</a>
@@ -234,7 +241,7 @@ function App() {
       {page === 'dashboard' && <>
         {!saved.onboarding_complete ? <FirstRunGuide
           settings={saved} status={status} catalog={initial.catalog}
-          globalSupported={initial.global_supported} trayAvailable={initial.tray_available}
+          globalSupported={initial.shortcut_backend !== 'unsupported'} trayAvailable={initial.tray_available}
           saving={saving || guideSaving} canSaveProgress={!changed} t={t}
           onNavigate={moveTo} onExecute={run} onProgress={saveGuideProgress}
         /> : !installed.includes(saved.speech_model) && <div className="message onboarding">
@@ -242,7 +249,24 @@ function App() {
             <p>{t('Dein gewähltes Modell ist nicht installiert. Lade es unter Modelle herunter oder importiere es.', 'The selected model is not installed. Download or import it under Models.')}</p></div>
           <button className="primary" onClick={() => moveTo('models')}>{t('Zu den Modellen', 'Open models')}</button>
         </div>}
-        {!initial.global_supported && <p className="message">{t('Wayland: Starte hier eine Aufnahme und kopiere den fertigen Text. Globale Tasten und automatisches Einfügen sind in dieser Sitzung deaktiviert.', 'Wayland: Record here and copy the finished text. Global shortcuts and automatic insertion are disabled in this session.')}</p>}
+        {initial.shortcut_backend === 'portal' && status?.shortcut_state === 'pending' && <p className="message">
+          {t('Wayland: Dein Desktop fragt die Freigabe für globale Tastenkürzel an. Bestätige den Dialog, damit Diktate auch außerhalb dieses Fensters starten. Bis dahin bleibt die Aufnahme hier verfügbar.',
+            'Wayland: Your desktop is asking for permission to use global shortcuts. Confirm the dialog so dictation can start outside this window. Until then, recording remains available here.')}
+        </p>}
+        {initial.shortcut_backend === 'portal' && ['denied', 'unavailable', 'error'].includes(status?.shortcut_state ?? '') && <p className="message error" role="alert">
+          {t('Globale Tastenkürzel sind auf diesem Wayland-Desktop nicht aktiv. Starte die Aufnahme hier und kopiere den Text bewusst. Die Zwischenablage wird nicht automatisch verändert.',
+            'Global shortcuts are not active on this Wayland desktop. Start recording here and copy the text deliberately. The clipboard is not changed automatically.')}
+          {' '}<button type="button" onClick={() => void run('retry_shortcuts')}>{t('Freigabe erneut anfragen', 'Request permission again')}</button>
+        </p>}
+        {status?.shortcut_state === 'active' && status?.shortcut_detail && <p className="message" role="status">{status.shortcut_detail}</p>}
+        {!initial.insertion_supported && initial.session_type === 'wayland' && <p className="message">
+          {t('Wayland: Automatisches Einfügen ist nicht verfügbar. Erkannte Texte gehen nicht verloren: Sie bleiben in Voicewright und lassen sich mit „Kopieren“ bewusst übernehmen.',
+            'Wayland: Automatic insertion is unavailable. Recognized text is never lost: it stays in Voicewright and can be copied deliberately.')}
+        </p>}
+        {!initial.insertion_supported && initial.session_type !== 'wayland' && initial.shortcut_backend !== 'unsupported' && <p className="message">
+          {t('Automatisches Einfügen ist auf diesem System nicht verfügbar. Erkannte Texte bleiben in Voicewright und lassen sich bewusst kopieren.',
+            'Automatic insertion is unavailable on this system. Recognized text stays in Voicewright and can be copied deliberately.')}
+        </p>}
         {status?.shortcut_error && <p className="message error" role="alert">{t('Tastenkürzel nicht verfügbar.', 'Shortcut unavailable.')} {status.shortcut_error}</p>}
         <Section title={t('Diktat', 'Dictation')}>
           <div className="record-status"><span className={phase === 'recording' ? 'dot live' : 'dot'} />
@@ -256,7 +280,8 @@ function App() {
             <div><dt>{t('Sprachmodell', 'Speech model')}</dt><dd>{modelName(saved.speech_model)}</dd></div>
             <div><dt>{t('Textkorrektur', 'Text editing')}</dt><dd>{saved.cleanup_mode === 'off' ? t('Aus', 'Off') : saved.cleanup_mode === 'local' ? modelName(saved.cleanup_model) : providers[saved.active_provider]}</dd></div>
             <div><dt>{t('Mikrofon', 'Microphone')}</dt><dd>{saved.microphone ? t('Ausgewähltes Gerät', 'Selected device') : t('Systemstandard', 'System default')}</dd></div>
-            <div><dt>{t('Globale Taste', 'Global shortcut')}</dt><dd>{status?.shortcut_active ? <><kbd>{saved.shortcut}</kbd> · {saved.recording_mode === 'hold' ? t('Halten', 'Hold') : t('Umschalten', 'Toggle')}</> : t('Nicht aktiv', 'Inactive')}</dd></div>
+            <div><dt>{t('Globale Taste', 'Global shortcut')}</dt><dd>{shortcutLabel}</dd></div>
+            <div><dt>{t('Automatisches Einfügen', 'Automatic insertion')}</dt><dd>{initial.insertion_supported ? t('Verfügbar', 'Available') : t('Nur Kopieren', 'Copy only')}</dd></div>
           </dl>
           <div className="actions">
             {phase === 'recording'
@@ -370,6 +395,14 @@ function App() {
           </select></Field>
           <label className="check"><input type="checkbox" checked={draft.auto_insert} onChange={(event) => update('auto_insert', event.target.checked)} />
             {t('Fertigen Text im geprüften Zielfenster einfügen', 'Insert finished text in the verified target window')}</label>
+          {!initial.insertion_supported && <p className="muted small">{t(
+            'Auf dieser Sitzung ist automatisches Einfügen nicht verfügbar. Die Einstellung bleibt für andere Systeme gespeichert; hier nutzt du den Kopieren-Knopf.',
+            'Automatic insertion is unavailable in this session. The setting stays saved for other systems; use the Copy button here.',
+          )}</p>}
+          {initial.insertion_supported && <p className="muted small">{t(
+            'Mehrzeilige Ergebnisse werden mit der Eingabetaste eingefügt. In Feldern, die Enter als Senden deuten, kann das eine Aktion auslösen. Bei Fokuswechsel oder gehaltener Sondertaste wird nicht weiter getippt.',
+            'Multi-line results are inserted with the Return key. In fields where Enter submits, this can trigger an action. Insertion stops on a focus change or a held modifier.',
+          )}</p>}
           <label className="check"><input type="checkbox" checked={draft.spoken_formatting}
             onChange={(event) => update('spoken_formatting', event.target.checked)} />
             {t('Gesprochene Satzzeichen und Zeilenumbrüche erkennen (optional)', 'Recognize spoken punctuation and line breaks (optional)')}</label>
