@@ -4,6 +4,7 @@ mod app;
 mod audio;
 mod cleanup;
 mod guard;
+mod hotkeys;
 mod insertion;
 mod models;
 mod providers;

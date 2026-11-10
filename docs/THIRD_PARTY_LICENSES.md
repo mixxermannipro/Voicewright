@@ -16,6 +16,10 @@ Fremdsoftware gelten jeweils die Lizenztexte und Hinweise der Urheber.
 | [Enigo](https://github.com/enigo-rs/enigo) | Direkte Texteingabe | MIT |
 | [arboard](https://github.com/1Password/arboard) | Zwischenablage | MIT oder Apache-2.0 |
 | [keyring-rs](https://github.com/hwchen/keyring-rs) | Zugangsdaten-Speicher | MIT oder Apache-2.0 |
+| [ashpd](https://github.com/bilelmoussaoui/ashpd) | XDG-Desktop-Portale für Wayland-Tastenkürzel | MIT |
+| [futures-util](https://github.com/rust-lang/futures-rs) | Asynchrone Stream-Helfer für das Portal | MIT oder Apache-2.0 |
+| [unicode-segmentation](https://github.com/unicode-rs/unicode-segmentation) | Graphem-sicheres Einfügen von Unicode | MIT oder Apache-2.0 |
+| [x11rb](https://github.com/psychon/x11rb) | X11-Verbindung und Fokusprüfung | MIT oder Apache-2.0 |
 
 Diese indirekten Rust-Abhängigkeiten verwenden MPL-2.0. Ihr Quellcode ist
 über die exakten Versionen auf crates.io verfügbar:
