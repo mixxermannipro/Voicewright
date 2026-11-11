@@ -309,7 +309,13 @@ async fn preview_cleanup(
             providers::cleanup(provider, &system, &transcript).await?
         }
     };
-    guard::validate(&transcript, edited)
+    let translated = !value.translation.trim().is_empty();
+    guard::validate_with(
+        &transcript,
+        edited,
+        value.requires_strict_cleanup() && !translated,
+        translated,
+    )
 }
 
 #[tauri::command]
@@ -550,7 +556,15 @@ async fn pipeline(
         if control.cancelled.load(Ordering::Relaxed) || !current_session(app, session) {
             return Ok(());
         }
-        match edited.and_then(|text| guard::validate(&transcript, text)) {
+        let translated = !settings.translation.trim().is_empty();
+        match edited.and_then(|text| {
+            guard::validate_with(
+                &transcript,
+                text,
+                settings.requires_strict_cleanup() && !translated,
+                translated,
+            )
+        }) {
             Ok(text) => text,
             Err(error) if settings.fallback => {
                 warning = Some(format!("Cleanup failed. Original text retained. {error}"));

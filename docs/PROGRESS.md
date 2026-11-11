@@ -55,6 +55,39 @@ vollständiger DEB-Durchlauf mit diesem Branch. Die Ergebnisse stehen in
 [PLATFORM_SUPPORT.md](PLATFORM_SUPPORT.md); die manuellen Schritte in
 [TESTING.md](TESTING.md).
 
+## Lokale Korrektur und Fallbacks (Issue #16, 11. November 2026)
+
+Die vorhandene Vorarbeit wurde gesichert und mit aktuellem `main` verbunden.
+Lokale Qwen3-Korrektur verwendet Greedy-Decoding, explizite Eingabe-/Ausgabe-
+und Zeitgrenzen sowie eine weiche RSS-Speicherüberwachung. Prozessfehler,
+Abbruch und Zeitüberschreitung erhalten kontrollierte Fehler; der eigene
+Kindprozess wird beendet und abgeholt. Alte Einstellungen bekommen den Stil
+Minimal. Natürlich/Formal sind opt-in, eigene Anweisungen bleiben editierbar.
+
+Der Standardmodus schützt Wörter und Reihenfolge, Negationen, Namen, Zahlen,
+Datumsangaben, URLs, Code und Kennungen. Neue Fakten werden ebenso geprüft
+wie entfernte; Zahlen/Kennungen müssen ohne Übersetzung in Reihenfolge bleiben.
+Das ist bewusst konservativ: Allgemeine Rechtschreib-/Grammatikänderungen
+können auf das Original zurückfallen. Eigene Prompts, Stilmodi und Übersetzung
+haben schwächere Wortprüfungen, aber weiterhin harte Fakten-/Codeprüfungen.
+Es gibt keine vollständige semantische Garantie.
+
+**Geprüft:** npm Typecheck/Lint, 6 Vitest-Tests, Produktionsbuild und Audit
+(0 Schwachstellen); Cargo fmt/Clippy für beide Projekte; 73 App-Unit-Tests
+plus 22 Golden-Tests, 9 Engine-/Protokolltests. Zusätzlich echter Qwen3-
+Protokolltest, 19-Fälle-Modellvergleich (13 akzeptiert, 6 sicher verworfen)
+und echte Whisper-Base-Erkennung mit synthetischen DE/EN-Stimmen bestanden.
+Die zuvor reproduzierten Schutzlücken haben Regressionstests.
+
+**Einordnung:** Der Kleinmodell-Vergleich belegt keinen Netto-Nutzen gegenüber
+Korrektur aus. Kein pauschales Empfehlungsversprechen; Korrektur bleibt
+standardmäßig aus. Menschlich gesprochene E2E-Diktate, echter OOM,
+Windows/macOS und der harte netzlose Containerlauf sind nicht abgenommen.
+Die Schließung von #16 erfolgt auf ausdrücklichen Wunsch mit diesen
+offengelegten Grenzen; eine plattformweite Release-Freigabe folgt daraus nicht.
+Bedienung: [LOCAL_CLEANUP.md](LOCAL_CLEANUP.md).
+Prüffälle und Ergebnisse: [LOCAL_CLEANUP_EVALUATION.md](LOCAL_CLEANUP_EVALUATION.md).
+
 ## Prompt-Härtung – Implementierung in Issue #17
 
 Auf einem separaten Feature-Branch liegt eine erweiterte Standardanweisung,
@@ -189,4 +222,3 @@ Es enthält konkrete Restrisiken und Sicherheits-Regressionen S01–S10.
 Security-Test oder abgeschlossener Audit.** Ohne reale OS-/Netzwerktests,
 Paket-Signierung und Nachweise für Hochrisiken bleibt Issue #27 ein
 Release-Blocker.
-
