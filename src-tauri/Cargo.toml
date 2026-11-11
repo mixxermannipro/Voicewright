@@ -31,6 +31,7 @@ whisper-rs = { version = "0.16", features = ["log_backend"] }
 [target.'cfg(target_os = "linux")'.dependencies]
 ashpd = { version = "0.14", default-features = false, features = ["global_shortcuts", "remote_desktop", "screencast", "clipboard", "tokio"] }
 futures-util = "0.3"
+libloading = "0.8"
 x11rb = "0.13"
 
 [target.'cfg(target_os = "windows")'.dependencies]

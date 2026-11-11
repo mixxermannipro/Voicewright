@@ -1,12 +1,17 @@
 //! Explicit, keyboard-only Wayland output probe. Not used by the app.
 
 #[cfg(target_os = "linux")]
+#[path = "../src/eis_text.rs"]
+mod eis_text;
+
+#[cfg(target_os = "linux")]
 mod linux {
     use ashpd::desktop::{
         remote_desktop::{DeviceType, KeyState, RemoteDesktop, SelectDevicesOptions},
         PersistMode,
     };
     use std::{
+        path::Path,
         sync::atomic::{AtomicBool, Ordering},
         time::Duration,
     };
@@ -15,6 +20,23 @@ mod linux {
 
     fn requested_devices() -> DeviceType {
         DeviceType::KEYBOARD
+    }
+
+    fn ensure_test_target(marker: Option<&Path>) -> Result<(), &'static str> {
+        use std::io::Read;
+        let Some(marker) = marker else {
+            return Ok(());
+        };
+        let mut bytes = Vec::new();
+        let ready = std::fs::File::open(marker)
+            .and_then(|file| file.take(16).read_to_end(&mut bytes))
+            .is_ok()
+            && bytes == b"ready\n";
+        if ready {
+            Ok(())
+        } else {
+            Err("Isolated test field is not focused; input stopped")
+        }
     }
 
     fn symbol_events(
@@ -43,8 +65,8 @@ mod linux {
 
     pub async fn run() -> Result<(), &'static str> {
         let mode = std::env::args().nth(1).unwrap_or_default();
-        if !matches!(mode.as_str(), "permission" | "keysym") {
-            return Err("Use permission (no input) or keysym (fixed single-line test). Clipboard transport is not verified yet.");
+        if !matches!(mode.as_str(), "permission" | "keysym" | "utf8") {
+            return Err("Use permission (no input), keysym or utf8 (fixed public test). Clipboard transport is not verified yet.");
         }
         let remote = RemoteDesktop::new()
             .await
@@ -83,11 +105,34 @@ mod linux {
                 println!("Permission probe complete; no input sent.");
                 return Ok(());
             }
+            if mode == "utf8" {
+                let fd = remote
+                    .connect_to_eis(&session, Default::default())
+                    .await
+                    .map_err(|_| "Could not connect to the approved EIS session")?;
+                println!("Fixed Unicode text with paragraph in 5 seconds; no keys or clipboard.");
+                tokio::time::sleep(Duration::from_secs(5)).await;
+                let marker = std::env::var_os("VOICEWRIGHT_PROBE_TARGET");
+                return tokio::task::spawn_blocking(move || {
+                    let mut client = crate::eis_text::Client::new(fd)?;
+                    client.send_text(
+                        "Grüße aus Köln, ÄÖÜ äöü ß 🙂\nSecond paragraph.",
+                        &AtomicBool::new(false),
+                        || ensure_test_target(marker.as_deref().map(Path::new)).is_ok(),
+                    )
+                })
+                .await
+                .map_err(|_| "Unicode text worker stopped")?;
+            }
             println!(
                 "Fixed single-line test in 5 seconds; paragraphs are not tested by keysym mode."
             );
             tokio::time::sleep(Duration::from_secs(5)).await;
+            let target_marker = std::env::var_os("VOICEWRIGHT_PROBE_TARGET");
             for (symbol, key_state) in symbol_events(LINE, &AtomicBool::new(false))? {
+                if key_state == KeyState::Pressed {
+                    ensure_test_target(target_marker.as_deref().map(Path::new))?;
+                }
                 if remote
                     .notify_keyboard_keysym(&session, symbol, key_state, Default::default())
                     .await
@@ -121,6 +166,18 @@ mod linux {
         #[test]
         fn keyboard_only_request() {
             assert_eq!(requested_devices().bits(), 1);
+        }
+
+        #[test]
+        fn an_unfocused_test_target_prevents_dispatch() {
+            let directory = tempfile::tempdir().unwrap();
+            let marker = directory.path().join("target");
+            assert!(ensure_test_target(Some(&marker)).is_err());
+            std::fs::write(&marker, b"not focused\n").unwrap();
+            assert!(ensure_test_target(Some(&marker)).is_err());
+            std::fs::write(&marker, b"ready\n").unwrap();
+            assert_eq!(ensure_test_target(Some(&marker)), Ok(()));
+            assert_eq!(ensure_test_target(None), Ok(()));
         }
 
         #[test]

@@ -51,9 +51,15 @@ Einzeiler ausgeben. Vier Unit-Tests wurden erst rot, dann grün nachgewiesen.
 Die echte Prüfung im Modus `permission` endete nach 60 Sekunden ohne
 bestätigte Desktopfreigabe. Es wurde kein Text eingegeben; der Prüfer beendet
 die Sitzung. Einzelheiten und ausstehende Tests: [WAYLAND_OUTPUT.md](WAYLAND_OUTPUT.md).
-Ohne diesen Pflichtnachweis bleiben größere Integration und stabiler Release
-gemäß freigegebenem Plan blockiert. Kein Copy-only-Release als V1 und keine
-Issue-Schließung aus dieser Vorprüfung ableiten.
+Dieser ursprüngliche Blocker wurde nach erneuter Freigabe überwunden:
+Keyboard-only-Sitzung geöffnet/geschlossen; direkte EIS-UTF8-Ausgabe in ein
+natives GTK-Wayland-Testfeld kam exakt an (45 Zeichen, inklusive Umlaute,
+ß, Emoji, Absatz und korrekter Groß-/Kleinschreibung). Der Keysym-Versuch
+bestand den exakten Vergleich nicht und wird nicht der V1-Transport.
+Der gewählte Weg benötigt `libei >= 1.6`, fordert nur Textfähigkeit an und
+fasst die Zwischenablage nicht an. Acht Prüfer-/Texttests bestanden.
+App-Integration und vollständige Paket-/Desktopabnahme sind noch offen;
+kein Copy-only-Release und keine Issue-Schließung aus der Vorprüfung ableiten.
 
 **Abschlussprüfung des Zwischenstands:** 107 App-/Beispieltests und 10
 Cleanup-Tests mit `--all-targets -- --include-ignored` einschließlich echter
