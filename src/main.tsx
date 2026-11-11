@@ -317,6 +317,15 @@ function App() {
           </select></Field>
           {draft.cleanup_mode === 'local' && <Field title={t('Lokales Modell', 'Local model')}>{modelPicker('cleanup', 'cleanup_model')}</Field>}
           {draft.cleanup_mode === 'cloud' && <p className="message">{t('Der Anbieter erhält deinen erkannten Text und die Bearbeitungsanweisung. Er kann Gebühren berechnen.', 'The provider receives your recognized text and editing instructions. Charges may apply.')}</p>}
+          <Field title={t('Stil', 'Style')} help={t(
+            'Minimal ist der Standard und ändert nur klare Fehler. Natürlich und Formal glätten den Text, ohne Fakten zu verändern.',
+            'Minimal is the default and fixes only clear errors. Natural and Formal smooth the text without changing facts.',
+          )}><select value={draft.cleanup_style}
+            onChange={(event) => update('cleanup_style', event.target.value as Settings['cleanup_style'])}>
+            <option value="minimal">{t('Minimal (Standard)', 'Minimal (default)')}</option>
+            <option value="natural">{t('Natürlich', 'Natural')}</option>
+            <option value="formal">{t('Formal', 'Formal')}</option>
+          </select></Field>
           <label className="check"><input type="checkbox" checked={draft.fallback} onChange={(event) => update('fallback', event.target.checked)} />
             {t('Bei Korrekturfehler das Original weiterverwenden', 'Use the original if editing fails')}</label>
         </Section>
@@ -446,7 +455,7 @@ function PromptEditor({ draft, update, defaultPrompt, t, onApply, canApply }: {
   const [preview, setPreview] = useState<{ signature: string; text: string } | null>(null);
   const [previewError, setPreviewError] = useState<{ signature: string; text: string } | null>(null);
   const signature = JSON.stringify([sample, draft.prompt, draft.vocabulary, draft.translation,
-    draft.cleanup_mode, draft.cleanup_model, draft.active_provider, draft.providers]);
+    draft.cleanup_mode, draft.cleanup_style, draft.cleanup_model, draft.active_provider, draft.providers]);
   const result = preview?.signature === signature ? preview.text : '';
   const testError = previewError?.signature === signature ? previewError.text : '';
   const previewPrompt = async () => {

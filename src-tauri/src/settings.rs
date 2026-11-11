@@ -39,6 +39,17 @@ pub enum RecordingMode {
     Toggle,
 }
 
+/// Optional style guidance on top of the conservative default instruction.
+/// `Minimal` adds nothing; the other modes must not change facts.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum CleanupStyle {
+    #[default]
+    Minimal,
+    Natural,
+    Formal,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub struct Settings {
@@ -49,6 +60,7 @@ pub struct Settings {
     pub speech_model: String,
     pub cleanup_model: String,
     pub cleanup_mode: CleanupMode,
+    pub cleanup_style: CleanupStyle,
     pub providers: BTreeMap<String, ProviderConfig>,
     pub active_provider: String,
     pub prompt: String,
@@ -77,6 +89,7 @@ impl Default for Settings {
             speech_model: "whisper-base".into(),
             cleanup_model: "qwen3-0.6b-q8".into(),
             cleanup_mode: CleanupMode::Off,
+            cleanup_style: CleanupStyle::Minimal,
             providers: BTreeMap::new(),
             active_provider: "open_ai".into(),
             prompt: DEFAULT_PROMPT.into(),
@@ -169,6 +182,13 @@ impl Settings {
         Ok(())
     }
 
+    /// The conservative default gets the strict fact-preservation guard.
+    /// A custom prompt may intentionally restructure text, so it only gets
+    /// the hard-fact checks and never silently drops numbers or URLs.
+    pub fn uses_default_prompt(&self) -> bool {
+        self.prompt.trim().is_empty() || self.prompt == DEFAULT_PROMPT
+    }
+
     pub fn system_prompt(&self) -> String {
         let mut prompt = if self.prompt.trim().is_empty() {
             DEFAULT_PROMPT.to_owned()
@@ -183,6 +203,15 @@ impl Settings {
             prompt.push_str("\nTranslate the finished transcription into ");
             prompt.push_str(self.translation.trim());
             prompt.push_str(". Output only the translation.");
+        }
+        match self.cleanup_style {
+            CleanupStyle::Minimal => {}
+            CleanupStyle::Natural => prompt.push_str(
+                "\nStyle: natural. Make the text read naturally while preserving meaning, facts, names, and numbers.",
+            ),
+            CleanupStyle::Formal => prompt.push_str(
+                "\nStyle: formal. Use a formal, professional register while preserving meaning, facts, names, and numbers.",
+            ),
         }
         prompt
     }
@@ -274,6 +303,22 @@ mod tests {
         assert!(system.contains("Ticket 4B"));
         settings.prompt = "CUSTOM".into();
         assert!(settings.system_prompt().starts_with("CUSTOM"));
+        assert!(!settings.uses_default_prompt());
+        settings.prompt.clear();
+        assert!(settings.uses_default_prompt());
+    }
+
+    #[test]
+    fn cleanup_style_is_conservative_by_default_and_roundtrips() {
+        let mut settings = Settings::default();
+        assert_eq!(settings.cleanup_style, CleanupStyle::Minimal);
+        assert_eq!(settings.system_prompt(), DEFAULT_PROMPT);
+        settings.cleanup_style = CleanupStyle::Natural;
+        assert!(settings.system_prompt().contains("Style: natural"));
+        settings.cleanup_style = CleanupStyle::Formal;
+        assert!(settings.system_prompt().contains("Style: formal"));
+        let old: Settings = serde_json::from_str(r#"{"schema_version":3}"#).unwrap();
+        assert_eq!(old.cleanup_style, CleanupStyle::Minimal);
     }
 
     #[test]
