@@ -34,6 +34,7 @@ export type Settings = {
   speech_model: string;
   cleanup_model: string;
   cleanup_mode: 'off' | 'local' | 'cloud';
+  cleanup_style: 'minimal' | 'natural' | 'formal';
   providers: Partial<Record<Provider, ProviderConfig>>;
   active_provider: Provider;
   prompt: string;

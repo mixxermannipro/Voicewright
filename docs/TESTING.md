@@ -138,6 +138,27 @@ Dateien, niemals mit echten personenbezogenen Daten oder produktiven Keys.
 
 ## Modelltests mit echten Gewichten
 
+### Lokale Korrektur und Faktenschutz (Issue #16)
+
+Zusätzlich zum Protokolltest unten läuft ein 19-Fälle-Vergleich mit echten
+Qwen3-Gewichten über die Ausgabeprüfung der App:
+
+```sh
+cargo build --manifest-path engines/cleanup/Cargo.toml --locked
+VOICEWRIGHT_TEST_GGUF=/absoluter/pfad/Qwen3-0.6B-Q8_0.gguf \
+  cargo test --manifest-path src-tauri/Cargo.toml --locked \
+  guard::tests::real_model_output_is_safe_or_rejected -- --ignored --nocapture
+```
+
+Bei abweichendem Build-Verzeichnis zusätzlich `VOICEWRIGHT_CLEANUP_BIN` auf
+das gebaute Programm setzen. Der Lauf enthält nur künstliche, öffentliche
+Testsätze; keine privaten Diktate verwenden. Er bewertet Modelltext gegen
+Baseline **Korrektur aus** und zeigt akzeptierte/abgewiesene Ergebnisse.
+Er ersetzt keine Abnahme mit menschlich gesprochenen Aufnahmen und echter
+Desktop-Einfügung. Konkrete Ergebnisse und Einschränkungen stehen in
+[LOCAL_CLEANUP_EVALUATION.md](LOCAL_CLEANUP_EVALUATION.md), Bedienung und
+Ressourcengrenzen in [LOCAL_CLEANUP.md](LOCAL_CLEANUP.md).
+
 Diese Tests laufen getrennt von den Standardprüfungen. Verwende das
 Whisper-Base- und das Qwen3-0.6B-Q8_0-Modell aus dem [Katalog](MODELS.md).
 Setze die beiden Modellpfade auf deine lokalen, geprüften Dateien.

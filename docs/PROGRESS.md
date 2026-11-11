@@ -76,11 +76,49 @@ lokaler Grenze 2.44 bestanden Layout, Laufzeiten und 202 ELF-Prüfungen.
 Dies ist **kein** Distributionsnachweis für Ubuntu/Debian. Endgültige Ergebnisse
 und Prüfsummen werden im [Linux-Protokoll](LINUX_RELEASE_TESTS.md) ergänzt.
 
+**GitHub-Nachweis:** Lauf `43026604832` für Stand `b8245f1` hat alle
+Pflichtchecks bestanden, einschließlich Release-DEB/AppImage auf Ubuntu
+22.04 mit GLIBC ≤ 2.35 (2 bzw. 180 ELF-Dateien). Prüfsummen und Link stehen
+im Linux-Protokoll. Nach Integration von #73 werden die Checks erneut ausgeführt.
+
 **Offen:** reale Installation/Updates auf fremden Distributionen, physisches
 Mikrofon, GNOME/KDE-/Wayland-Abnahme und vollständige Lizenzprüfung aller
 gebündelten Systembibliotheken. Kein bit-identisches Buildversprechen.
-Issue #16 ist eine separate, parallel laufende Cleanup-Arbeit und wird durch
-diese Paketänderungen nicht als erledigt erklärt.
+Die separate Cleanup-Arbeit für #16 ist inzwischen über PR #73 integriert;
+ihre Ergebnisse und Grenzen stehen im folgenden Abschnitt.
+
+## Lokale Korrektur und Fallbacks (Issue #16, 11. November 2026)
+
+Die vorhandene Vorarbeit wurde gesichert und mit aktuellem `main` verbunden.
+Lokale Qwen3-Korrektur verwendet Greedy-Decoding, explizite Eingabe-/Ausgabe-
+und Zeitgrenzen sowie eine weiche RSS-Speicherüberwachung. Prozessfehler,
+Abbruch und Zeitüberschreitung erhalten kontrollierte Fehler; der eigene
+Kindprozess wird beendet und abgeholt. Alte Einstellungen bekommen den Stil
+Minimal. Natürlich/Formal sind opt-in, eigene Anweisungen bleiben editierbar.
+
+Der Standardmodus schützt Wörter und Reihenfolge, Negationen, Namen, Zahlen,
+Datumsangaben, URLs, Code und Kennungen. Neue Fakten werden ebenso geprüft
+wie entfernte; Zahlen/Kennungen müssen ohne Übersetzung in Reihenfolge bleiben.
+Das ist bewusst konservativ: Allgemeine Rechtschreib-/Grammatikänderungen
+können auf das Original zurückfallen. Eigene Prompts, Stilmodi und Übersetzung
+haben schwächere Wortprüfungen, aber weiterhin harte Fakten-/Codeprüfungen.
+Es gibt keine vollständige semantische Garantie.
+
+**Geprüft:** npm Typecheck/Lint, 6 Vitest-Tests, Produktionsbuild und Audit
+(0 Schwachstellen); Cargo fmt/Clippy für beide Projekte; 73 App-Unit-Tests
+plus 22 Golden-Tests, 9 Engine-/Protokolltests. Zusätzlich echter Qwen3-
+Protokolltest, 19-Fälle-Modellvergleich (13 akzeptiert, 6 sicher verworfen)
+und echte Whisper-Base-Erkennung mit synthetischen DE/EN-Stimmen bestanden.
+Die zuvor reproduzierten Schutzlücken haben Regressionstests.
+
+**Einordnung:** Der Kleinmodell-Vergleich belegt keinen Netto-Nutzen gegenüber
+Korrektur aus. Kein pauschales Empfehlungsversprechen; Korrektur bleibt
+standardmäßig aus. Menschlich gesprochene E2E-Diktate, echter OOM,
+Windows/macOS und der harte netzlose Containerlauf sind nicht abgenommen.
+Die Schließung von #16 erfolgt auf ausdrücklichen Wunsch mit diesen
+offengelegten Grenzen; eine plattformweite Release-Freigabe folgt daraus nicht.
+Bedienung: [LOCAL_CLEANUP.md](LOCAL_CLEANUP.md).
+Prüffälle und Ergebnisse: [LOCAL_CLEANUP_EVALUATION.md](LOCAL_CLEANUP_EVALUATION.md).
 
 ## Prompt-Härtung – Implementierung in Issue #17
 

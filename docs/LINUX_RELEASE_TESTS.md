@@ -31,6 +31,20 @@ Builds are repeatable from locked sources; bit-for-bit reproducibility is
 **not claimed** because system packages and downloaded bundler tools are not
 fully pinned. `SOURCE_DATE_EPOCH` uses the source commit timestamp.
 
+## CI-Nachweis / CI evidence
+
+Am 11. November 2026 hat [CI-Lauf 43026604832](https://github.com/mixxermannipro/Voicewright/actions/runs/43026604832)
+für Quellstand `b8245f1` alle Pflichtchecks bestanden. Auf Ubuntu 22.04 wurden
+Release-DEB (2 ELF-Dateien) und AppImage (180 ELF-Dateien) einschließlich
+Metadaten, Rechten und GLIBC ≤ 2.35 erfolgreich geprüft.
+All required checks passed for that source revision; this is packaging/ABI
+evidence, not a manual desktop or microphone certification.
+
+```text
+58359d47cd368bb9dedc28e054d5e52b4ce54c196792f36a6dec83a84bc12bc4  Voicewright_0.1.0-alpha.1_amd64.deb
+5d5f19a892201f714fef2a986bfbbfc0d5c545ace8569792497f6aa14cef1701  Voicewright_0.1.0-alpha.1_amd64.AppImage
+```
+
 ## Reales Testprotokoll / Real desktop test record
 
 **Lokaler Lauf, 11. November 2026, Fedora 45 KDE Wayland, Linux x64:**
