@@ -662,13 +662,14 @@ fn negation_count(words: &[String]) -> usize {
 }
 
 fn negation_contexts(words: &[String]) -> Vec<(&str, Option<&str>)> {
+    let words = content_words(words);
     words
         .iter()
         .enumerate()
-        .filter(|(_, word)| NEGATIONS.contains(&word.as_str()))
+        .filter(|(_, word)| NEGATIONS.contains(word))
         .map(|(index, word)| {
             let next = words.get(index + 1);
-            (word.as_str(), next.map(String::as_str))
+            (*word, next.copied())
         })
         .collect()
 }
@@ -821,6 +822,13 @@ mod tests {
         assert_eq!(
             validate("äh ich ich fahre morgen", "Ich fahre morgen.".into()),
             Ok("Ich fahre morgen.".into())
+        );
+        assert_eq!(
+            validate(
+                "ich weiß nicht äh ob das geht",
+                "Ich weiß nicht, ob das geht.".into()
+            ),
+            Ok("Ich weiß nicht, ob das geht.".into())
         );
     }
 
