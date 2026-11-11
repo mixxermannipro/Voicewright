@@ -25,6 +25,7 @@ jobs:
     timeout-minutes: 25
     if: >-
       github.event.pull_request.merged == false &&
+      github.event.pull_request.draft == false &&
       (
         github.event.pull_request.user.login == 'mixxermannipro' ||
         github.event.pull_request.user.login == 'dependabot[bot]'

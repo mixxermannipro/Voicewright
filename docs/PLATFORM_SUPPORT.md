@@ -118,5 +118,8 @@ Freigabe für alle Anwendungen.
 Eine erfolgreiche Paketerstellung prüft keine Geräte und keine
 Berechtigungen. Für den manuellen Durchlauf siehe [TESTING.md](TESTING.md).
 Fenster mit erhöhten Rechten und geschützte Eingabefelder fallen außerhalb
-der vorgesehenen Unterstützung. Der Veröffentlichungsablauf sieht Ubuntu 24.04 für den Linux-Paketbau vor.
-Der bisherige DEB-Test lief in Debian 12. Ältere Distributionen können an neueren Systembibliotheken scheitern.
+der vorgesehenen Unterstützung. Der Linux-Paketbau läuft auf Ubuntu 22.04;
+der Paketprüfer begrenzt enthaltene ELF-Dateien auf GLIBC 2.35. Fedora nutzt
+AppImage. Der bisherige DEB-Test lief in Debian 12. Das ist kein Nachweis für
+die neuen Releasepakete. Testziele, Paketupdates und tatsächliche Abnahmen
+stehen im [Linux-Testprotokoll](LINUX_RELEASE_TESTS.md).

@@ -81,13 +81,28 @@ async fn run_with_limits(
     let mut command = tokio::process::Command::new(binary);
     #[cfg(windows)]
     command.creation_flags(0x08000000);
-    let mut child = command
+    command
         .kill_on_drop(true)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .map_err(|_| "Could not start the bundled cleanup engine.")?;
+        .stderr(Stdio::null());
+    let mut retries = 0;
+    let mut child = loop {
+        if cancelled.load(Ordering::Relaxed) {
+            return Err("cancelled".into());
+        }
+        match command.spawn() {
+            Ok(child) => break child,
+            // Linux can briefly retain a writable descriptor during another
+            // process's fork/exec or a package replacement. Do not retry other
+            // errors, and never wait indefinitely for a genuinely busy file.
+            Err(error) if error.kind() == std::io::ErrorKind::ExecutableFileBusy && retries < 5 => {
+                retries += 1;
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+            Err(_) => return Err("Could not start the bundled cleanup engine.".into()),
+        }
+    };
     let mut stdin = child.stdin.take().ok_or("Could not open cleanup input.")?;
     let mut stdout = child
         .stdout
@@ -209,6 +224,53 @@ mod tests {
         assert_eq!(result, Ok("ok".into()));
     }
 
+    #[cfg(target_os = "linux")]
+    #[tokio::test]
+    async fn retries_a_temporarily_busy_executable_but_bounds_startup() {
+        let (_directory, binary) = script("cat >/dev/null\nprintf '{\"text\":\"ok\"}'");
+        let writer = std::fs::OpenOptions::new()
+            .write(true)
+            .open(&binary)
+            .unwrap();
+        let release = tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+            drop(writer);
+        });
+        let result = run_with_limits(
+            &binary,
+            Path::new("/missing.gguf"),
+            "system",
+            "transcript",
+            &AtomicBool::new(false),
+            Duration::from_secs(5),
+        )
+        .await;
+        release.await.unwrap();
+        assert_eq!(result, Ok("ok".into()));
+
+        let _writer = std::fs::OpenOptions::new()
+            .write(true)
+            .open(&binary)
+            .unwrap();
+        let result = tokio::time::timeout(
+            Duration::from_secs(1),
+            run_with_limits(
+                &binary,
+                Path::new("/missing.gguf"),
+                "system",
+                "transcript",
+                &AtomicBool::new(false),
+                Duration::from_secs(5),
+            ),
+        )
+        .await
+        .expect("a persistently busy executable must not retry forever");
+        assert_eq!(
+            result,
+            Err("Could not start the bundled cleanup engine.".into())
+        );
+    }
+
     #[cfg(unix)]
     #[tokio::test]
     async fn reports_sidecar_errors_and_invalid_output() {
@@ -282,7 +344,8 @@ mod tests {
             Duration::from_millis(100),
         )
         .await;
-        assert!(result.unwrap_err().contains("took too long"));
+        let error = result.unwrap_err();
+        assert!(error.contains("took too long"), "unexpected error: {error}");
 
         let (_directory, binary) = script("cat >/dev/null\nexec sleep 5");
         let cancelled = Arc::new(AtomicBool::new(false));

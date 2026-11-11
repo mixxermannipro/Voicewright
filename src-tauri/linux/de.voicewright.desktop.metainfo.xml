@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>de.voicewright.desktop</id>
+  <name>Voicewright</name>
+  <summary>Local offline dictation</summary>
+  <summary xml:lang="de">Lokales Offline-Diktat</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <description>
+    <p>Dictate locally with Whisper and optionally clean up text with a local model.
+    Cloud processing requires your own explicit configuration. Models are downloaded separately.</p>
+    <p xml:lang="de">Lokal mit Whisper diktieren und Text optional mit einem lokalen Modell
+    korrigieren. Cloud-Verarbeitung erfordert eine eigene ausdrückliche Konfiguration.
+    Modelle werden getrennt heruntergeladen.</p>
+  </description>
+  <launchable type="desktop-id">Voicewright.desktop</launchable>
+  <url type="homepage">https://github.com/mixxermannipro/Voicewright</url>
+  <url type="bugtracker">https://github.com/mixxermannipro/Voicewright/issues</url>
+  <content_rating type="oars-1.1" />
+</component>

@@ -20,6 +20,17 @@ npm audit --audit-level=high
 Der GitHub-Ablauf prüft zusätzlich beide Rust-Abhängigkeitslisten mit
 `cargo audit`. Dafür wird `cargo-audit` aus RustSec benötigt.
 
+## Linux-Releasepakete (Issue #32)
+
+Der Pflicht-Check baut AppImage und DEB auf Ubuntu 22.04 und prüft sie mit
+`scripts/check-linux-bundle.py`. Lokale Prüfbefehle und manuelle
+Distributions-/Update-Checkliste: [LINUX_RELEASE_TESTS.md](LINUX_RELEASE_TESTS.md).
+`scripts/linux-smoke/run.sh` akzeptiert neben DEB jetzt auch AppImage;
+die übrigen Argumente und die Container-Isolation bleiben unverändert.
+`.cargo/config.toml` deaktiviert native/AVX-GGML-Builds für beide Engines.
+Nach Änderungen an diesen Flags vorhandene Build-Caches nicht ungeprüft
+übernehmen; CI verwendet dafür einen eigenen, konfigurationsabhängigen Cache.
+
 ## Regressionen für Einstellungen und Sicherung (Issue #26)
 
 Zusätzlich zu den Rust-Unit-Tests aus

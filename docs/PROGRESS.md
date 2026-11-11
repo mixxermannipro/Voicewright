@@ -55,6 +55,48 @@ vollständiger DEB-Durchlauf mit diesem Branch. Die Ergebnisse stehen in
 [PLATFORM_SUPPORT.md](PLATFORM_SUPPORT.md); die manuellen Schritte in
 [TESTING.md](TESTING.md).
 
+## Linux-Paketierung (Issue #32, 11. November 2026)
+
+Der Paketbau bleibt bei Tauri und läuft als zusätzlicher Pflicht-Check bereits
+für PRs auf Ubuntu 22.04. AppImage (für Fedora priorisiert) und DEB enthalten
+AppStream-Metadaten, Desktop-Eintrag, Icons, Cleanup-Sidecar und Lizenzhinweise.
+Der Prüfer kontrolliert Layout, Dateirechte, dynamische Bibliotheken und
+GLIBC ≤ 2.35 für enthaltene ELF-Dateien. SHA-256 und Prüfbericht liegen beim
+Actions-Artefakt. Der Releaseablauf übernimmt dieselben geprüften Linux-Pakete.
+GGML baut ohne native/AVX-Anforderungen; der Sidecar-Paketcache ist von alten
+AVX-Builds getrennt. Der X11-Smoke unterstützt nun auch AppImage.
+
+**Lokal nachgewiesen:** npm-Typprüfung, Lint, 12 Tests, Webbuild und Audit (0
+Schwachstellen); beide Rust-fmt-/Clippy-Prüfungen, 78 App-/Parser-Tests und
+6 Engine-/Protokolltests; je ein echter Modelltest blieb ohne Gewichte
+übersprungen. 7 Python-Paketprüfertests, AppStream und actionlint bestanden. Release-DEB
+und AppImage wurden auf Fedora 45 gebaut. Das Fedora-AppImage benötigt GLIBC
+2.44; der Prüfer hat die portable Grenze korrekt abgewiesen. Mit expliziter
+lokaler Grenze 2.44 bestanden Layout, Laufzeiten und 202 ELF-Prüfungen.
+Dies ist **kein** Distributionsnachweis für Ubuntu/Debian. Endgültige Ergebnisse
+und Prüfsummen werden im [Linux-Protokoll](LINUX_RELEASE_TESTS.md) ergänzt.
+
+**GitHub-Nachweis:** Lauf `43026604832` für Stand `b8245f1` hat alle
+Pflichtchecks bestanden, einschließlich Release-DEB/AppImage auf Ubuntu
+22.04 mit GLIBC ≤ 2.35 (2 bzw. 180 ELF-Dateien). Prüfsummen und Link stehen
+im Linux-Protokoll. Nach Integration von #73 werden die Checks erneut ausgeführt.
+
+**Nach Integration von #73 lokal erneut geprüft:** 12 npm- und 7 Python-Tests,
+96 App-/Parser-Tests (10 vollständige Durchläufe) und 9 Engine-/Protokolltests;
+fmt/Clippy für beide Cargo-Projekte bestanden. Zwei App-Modelltests und ein
+Engine-Modelltest blieben ohne Gewichte übersprungen. Dabei wurde zunächst
+ein sporadischer Linux-Startfehler `ETXTBSY` reproduziert. Ausschließlich
+dieser Fehler erhält jetzt bis zu fünf Wiederholungen mit jeweils 10 ms;
+Abbruch und dauerhafte Fehler bleiben kontrolliert. Ein echter Schreibhandle
+reproduziert im neuen Test sowohl vorübergehend als auch dauerhaft belegte
+Programmdateien. Der Test war vor der Korrektur rot, danach grün.
+
+**Offen:** reale Installation/Updates auf fremden Distributionen, physisches
+Mikrofon, GNOME/KDE-/Wayland-Abnahme und vollständige Lizenzprüfung aller
+gebündelten Systembibliotheken. Kein bit-identisches Buildversprechen.
+Die separate Cleanup-Arbeit für #16 ist inzwischen über PR #73 integriert;
+ihre Ergebnisse und Grenzen stehen im folgenden Abschnitt.
+
 ## Lokale Korrektur und Fallbacks (Issue #16, 11. November 2026)
 
 Die vorhandene Vorarbeit wurde gesichert und mit aktuellem `main` verbunden.

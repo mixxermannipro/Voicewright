@@ -24,6 +24,10 @@ der Versionsnummer.
    den Quellstand und baut NSIS-EXE, DMG, AppImage und DEB auf getrennten
    Rechnern. Erst nach allen erfolgreichen Builds und Prüfungen veröffentlicht
    er die vier Dateien und ihre SHA-256-Prüfsummen.
+   Linux wird bereits im wiederverwendeten CI-Check auf Ubuntu 22.04 gebaut
+   und vor dem Upload geprüft; der Releasejob verwendet genau dieses Artefakt.
+   Das [Linux-Testprotokoll](LINUX_RELEASE_TESTS.md) trennt Paketprüfungen von
+   noch ausstehenden echten Desktop-/Update-Tests.
 4. Öffne die Vorabversion auf GitHub. Vergleiche die Paketliste und prüfe
    nach einem Download mindestens die Prüfsummen. Nenne den getesteten
    Quellstand und die Ergebnisse der Installationsprüfungen im Projektstand.
