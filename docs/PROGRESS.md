@@ -8,8 +8,9 @@ unter Fedora Wayland ausdrücklich als Pflichtfunktion. Der
 [V1-Entwurf](superpowers/specs/2026-11-11-v1-fedora-design.md) ist vom Anwender
 freigegeben; der [Implementierungsplan](superpowers/plans/2026-11-11-v1-fedora.md)
 ist ebenfalls bestätigt und wird ohne weitere Umfangsfragen umgesetzt.
-Es wurde noch kein V1-Produktcode implementiert und kein Release
-erstellt. Issues werden erst nach der Umsetzung abgeglichen, nicht zur
+Ein isolierter Wayland-Prüfer ist implementiert, aber noch kein
+V1-Ausgabebackend in die App integriert und kein Release erstellt.
+Issues werden erst nach der Umsetzung abgeglichen, nicht zur
 Arbeitsauswahl verwendet. Die vorhandene unversionierte
 `.github/workflows/platforms.yml` bleibt unangetastet.
 
@@ -43,6 +44,25 @@ stimmen. Der Whisper-Test mit synthetischen DE/EN-WAVs (7,87 s), der
 Qwen-DE/EN-Protokolltest (8,10 s) und der 19-Fälle-Guard-Vergleich (24,81 s)
 bestanden. Keine echte Mikrofon-/Wayland-Ausgabeabnahme und kein Nachweis
 eines allgemeinen Korrekturvorteils daraus ableiten.
+
+**Wayland-Vorprüfung:** `src-tauri/examples/wayland_output_probe.rs` fordert
+explizit nur Keyboard-Portalrechte an und kann einen festen öffentlichen
+Einzeiler ausgeben. Vier Unit-Tests wurden erst rot, dann grün nachgewiesen.
+Die echte Prüfung im Modus `permission` endete nach 60 Sekunden ohne
+bestätigte Desktopfreigabe. Es wurde kein Text eingegeben; der Prüfer beendet
+die Sitzung. Einzelheiten und ausstehende Tests: [WAYLAND_OUTPUT.md](WAYLAND_OUTPUT.md).
+Ohne diesen Pflichtnachweis bleiben größere Integration und stabiler Release
+gemäß freigegebenem Plan blockiert. Kein Copy-only-Release als V1 und keine
+Issue-Schließung aus dieser Vorprüfung ableiten.
+
+**Abschlussprüfung des Zwischenstands:** 107 App-/Beispieltests und 10
+Cleanup-Tests mit `--all-targets -- --include-ignored` einschließlich echter
+Gewichte bestanden, ohne übersprungene Tests. Beide fmt-/Clippy-Prüfungen,
+12 npm-Tests, Typprüfung, Lint, Web-Build, npm-Audit (0 Treffer) und 7
+Python-Paketprüfertests bestanden. CI und gesicherte CI-Vorlage verwenden
+für die App jetzt `--all-targets`, da der vorherige Aufruf die vier neuen
+Example-Tests nicht ausführte. Eine unabhängige Codeprüfung war wegen des
+DeepSeek-Gratislimits nicht verfügbar; nur Selbstprüfung, keine Merge-Freigabe.
 
 Der Alpha-Stand aus [PR #1](https://github.com/mixxermannipro/Voicewright/pull/1)
 wurde am 7. November 2026 nach `main` integriert. Der Zweig
