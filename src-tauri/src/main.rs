@@ -3,6 +3,7 @@
 mod app;
 mod audio;
 mod cleanup;
+mod desktop_integration;
 #[cfg(target_os = "linux")]
 mod eis_text;
 mod guard;

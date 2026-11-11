@@ -45,6 +45,10 @@ export type Settings = {
   fallback: boolean;
   auto_insert: boolean;
   wayland_insertion_consent: boolean;
+  theme: 'system' | 'light' | 'dark';
+  start_in_background: boolean;
+  autostart: boolean;
+  show_hud: boolean;
   shortcut: string;
   cancel_shortcut: string;
   recording_mode: 'hold' | 'toggle';
@@ -66,6 +70,7 @@ export type Initial = {
 };
 export type Phase = 'idle' | 'recording' | 'transcribing' | 'cleaning' | 'inserting' | 'completed' | 'cancelled' | 'failed';
 export type Status = {
+  paused: boolean;
   phase: Phase; elapsed_ms: number; level: number; transcript: string | null; warning: string | null;
   inserted: boolean; shortcut_error: string | null; shortcut_detail: string | null;
   shortcut_active: boolean; shortcut_state: ShortcutState; installed: string[];

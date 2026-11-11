@@ -7,6 +7,7 @@ import {
   type Initial, type Kind, type Phase, type Provider, type ProviderConfig, type Settings, type Status,
 } from './domain';
 import { FirstRunGuide } from './FirstRunGuide';
+import { Hud } from './Hud';
 import './style.css';
 
 type Copy = (de: string, en: string) => string;
@@ -631,4 +632,4 @@ function ProviderCredentials({ config, t, changeModel }: { config: ProviderConfi
   </>;
 }
 
-createRoot(document.getElementById('root')!).render(<App />);
+createRoot(document.getElementById('root')!).render(new URLSearchParams(window.location.search).has('hud') ? <Hud /> : <App />);

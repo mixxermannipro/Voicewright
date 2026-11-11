@@ -1,5 +1,18 @@
 # Ersteinrichtung / First-run setup
 
+## V1-Hintergrundbetrieb / V1 background behavior
+
+Nach abgeschlossener Einrichtung kann das Hauptfenster beim Start geschlossen
+bleiben; ohne Tray oder bei Startfehlern bleibt es erreichbar. Pause bricht
+ein laufendes Diktat ab. Linux-Autostart wird nur bewusst in den Einstellungen
+aktiviert; verschiebst du ein AppImage, richte den Autostart erneut ein.
+Das optionale HUD bleibt unter Wayland aus, bis Fokuslosigkeit belegt ist.
+
+After setup, background startup keeps the main window hidden only when the
+tray is available and startup succeeded. Pause cancels an active dictation.
+Linux autostart requires explicit opt-in; configure it again after moving an
+AppImage. The optional HUD remains disabled on Wayland without focus-safety proof.
+
 **Status:** Entwicklungsstand für Issue #22. Die folgenden Schritte werden in
 der Anwendung angeboten, ersetzen aber **noch keine erfolgreich
 abgeschlossenen Windows-/macOS-/Linux-Release-Tests**.

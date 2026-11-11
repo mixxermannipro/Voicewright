@@ -66,6 +66,17 @@ an die Oberfläche gemeldet. Mikrofontests geben niemals extern aus.
 Die vollständige Paket-/Desktopabnahme ist noch offen;
 kein Copy-only-Release und keine Issue-Schließung aus der Vorprüfung ableiten.
 
+**Hintergrundbetrieb:** Neue rückwärtsverträgliche Einstellungen für
+System/Hell/Dunkel, Hintergrundstart, bewussten Linux-Autostart und optionales
+HUD. Pause bricht aktive Erkennung ab und invalidiert spätere Ausgabe.
+Erststart, Konfigurationsfehler und fehlendes Tray lassen das Hauptfenster
+sichtbar. Linux-Autostart verwaltet nur den eigenen markierten Desktop-Eintrag;
+fremde Dateien/Symlinks und ungeeignete oder fehlende Programmdateien werden
+abgewiesen. Imports aktivieren weder Autostart noch Wayland-Eingaberechte.
+Das HUD bleibt auf Wayland aus, weil die Fokuslosigkeit dort nicht belegt ist;
+Tray und Einstellungen bleiben als Statuswege verfügbar. X11-HUD-Fokus und
+realer Autostart nach Anmeldung bleiben praktisch zu prüfen.
+
 **Abschlussprüfung des Zwischenstands:** 107 App-/Beispieltests und 10
 Cleanup-Tests mit `--all-targets -- --include-ignored` einschließlich echter
 Gewichte bestanden, ohne übersprungene Tests. Beide fmt-/Clippy-Prüfungen,

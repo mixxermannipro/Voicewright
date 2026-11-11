@@ -1,6 +1,6 @@
 use crate::{
     audio::{self, Capture},
-    cleanup, guard, hotkeys, insertion, models, providers,
+    cleanup, desktop_integration, guard, hotkeys, insertion, models, providers,
     session::{apply_shortcut_changes, Action, HotkeyState, Phase, ShortcutKind, Status},
     settings::{self, CleanupMode, RecordingMode, Settings},
     settings_portable, speech, spoken_format, wayland_output,
@@ -50,6 +50,7 @@ fn migrate_legacy_data(root: &Path) {
 }
 
 struct Inner {
+    paused: bool,
     settings: Settings,
     status: Status,
     capture: Option<Arc<Capture>>,
@@ -83,6 +84,7 @@ struct Hardware {
 
 #[derive(Serialize)]
 struct StatusView {
+    paused: bool,
     phase: Phase,
     elapsed_ms: u64,
     level: f32,
@@ -149,6 +151,7 @@ fn status(state: State<'_, AppState>) -> StatusView {
     let inner = state.inner.lock().unwrap();
     let output = output_status(&state);
     StatusView {
+        paused: inner.paused,
         phase: inner.status.phase,
         elapsed_ms: inner
             .status
@@ -264,7 +267,22 @@ fn save_settings(
     if native {
         replace_shortcuts(&app, &previous, &next)?;
     }
+    let autostart_changed = value.autostart != inner.settings.autostart;
+    if autostart_changed {
+        if let Err(error) = configure_autostart(&app, value.autostart) {
+            if native && replace_shortcuts(&app, &next, &previous).is_err() {
+                inner.shortcut_active = false;
+                inner.shortcut_state = hotkeys::ShortcutStatus::Error;
+                return Err(format!("{error} Shortcut rollback failed."));
+            }
+            return Err(error);
+        }
+    }
     if let Err(error) = settings::save(&state.settings(), &value) {
+        let mut error = error;
+        if autostart_changed && configure_autostart(&app, inner.settings.autostart).is_err() {
+            error.push_str(" Autostart rollback failed; inspect the desktop setting.");
+        }
         if native {
             let rollback = replace_shortcuts(&app, &next, &previous);
             if rollback.is_err() {
@@ -317,6 +335,47 @@ fn save_settings(
 
 fn should_rebind_shortcuts(before: &Settings, after: &Settings) -> bool {
     hotkeys::bindings(before) != hotkeys::bindings(after)
+}
+
+fn configure_autostart(app: &AppHandle, enabled: bool) -> Result<bool, String> {
+    #[cfg(target_os = "linux")]
+    {
+        let config = app
+            .path()
+            .config_dir()
+            .map_err(|_| "Could not locate desktop configuration.")?;
+        let executable = if enabled {
+            std::env::var_os("APPIMAGE")
+                .map(PathBuf::from)
+                .map(Ok)
+                .unwrap_or_else(std::env::current_exe)
+                .map_err(|_| "Could not locate the application executable.")?
+        } else {
+            PathBuf::new()
+        };
+        desktop_integration::set_autostart(&config, &executable, enabled)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = app;
+        if enabled {
+            Err("Autostart is not implemented on this platform.".into())
+        } else {
+            Ok(false)
+        }
+    }
+}
+
+#[tauri::command]
+fn set_autostart(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    enabled: bool,
+) -> Result<bool, String> {
+    let mut value = state.inner.lock().unwrap().settings.clone();
+    value.autostart = enabled;
+    save_settings(app, state, value)?;
+    Ok(enabled)
 }
 
 #[tauri::command]
@@ -457,6 +516,9 @@ fn start_session(app: &AppHandle, from_hotkey: bool) -> Result<(), String> {
     if inner.status.phase.busy() {
         return Err("A dictation is already in progress.".into());
     }
+    if inner.paused {
+        return Err("Dictation is paused.".into());
+    }
     if inner.transfer.is_some() && !inner.download.as_ref().is_some_and(|item| item.active) {
         return Err("Finish importing the model before recording.".into());
     }
@@ -526,16 +588,24 @@ fn start_session(app: &AppHandle, from_hotkey: bool) -> Result<(), String> {
 }
 
 fn set_tray_status(app: &AppHandle, phase: Phase, has_warning: bool) {
+    update_hud(app, phase);
     let Some(tray) = app.tray_by_id("main") else {
         return;
     };
-    let text = match phase {
-        Phase::Recording => "Voicewright · ● Aufnahme / Recording",
-        Phase::Transcribing => "Voicewright · Spracherkennung / Transcribing",
-        Phase::Cleaning => "Voicewright · Textkorrektur / Editing",
-        Phase::Failed => "Voicewright · Fehler / Error",
-        Phase::Completed if has_warning => "Voicewright · Text zum Kopieren / Text ready to copy",
-        _ => "Voicewright",
+    let paused = app.state::<AppState>().inner.lock().unwrap().paused;
+    let text = if paused {
+        "Voicewright · Pausiert / Paused"
+    } else {
+        match phase {
+            Phase::Recording => "Voicewright · ● Aufnahme / Recording",
+            Phase::Transcribing => "Voicewright · Spracherkennung / Transcribing",
+            Phase::Cleaning => "Voicewright · Textkorrektur / Editing",
+            Phase::Failed => "Voicewright · Fehler / Error",
+            Phase::Completed if has_warning => {
+                "Voicewright · Text zum Kopieren / Text ready to copy"
+            }
+            _ => "Voicewright",
+        }
     };
     let _ = tray.set_tooltip(Some(text));
     let image = if phase == Phase::Recording {
@@ -837,6 +907,77 @@ fn cancel(app: AppHandle) {
     set_tray_status(&app, Phase::Cancelled, false);
 }
 
+fn pause_state(inner: &mut Inner, paused: bool) {
+    inner.paused = paused;
+    inner.press.reset();
+    if paused && inner.status.phase.busy() {
+        if let Some(capture) = &inner.capture {
+            capture.cancelled.store(true, Ordering::SeqCst);
+            capture.stop.store(true, Ordering::SeqCst);
+        }
+        inner.session = inner.session.wrapping_add(1);
+        inner.capture = None;
+        inner.status.recording_since = None;
+        inner.status.phase = Phase::Cancelled;
+        inner.status.inserted = false;
+    }
+}
+
+#[tauri::command]
+fn set_paused(app: AppHandle, paused: bool) {
+    let phase = {
+        let state = app.state::<AppState>();
+        let mut inner = state.inner.lock().unwrap();
+        pause_state(&mut inner, paused);
+        inner.status.phase
+    };
+    set_tray_status(&app, phase, false);
+}
+
+fn update_hud(app: &AppHandle, phase: Phase) {
+    // Wayland does not provide a verified focusless overlay contract here.
+    // Never risk taking focus from the text target for optional decoration.
+    if insertion::session_kind() != insertion::SessionKind::X11 {
+        return;
+    }
+    let enabled = app
+        .state::<AppState>()
+        .inner
+        .lock()
+        .unwrap()
+        .settings
+        .show_hud;
+    let visible = enabled && (phase.busy() || phase == Phase::Failed);
+    let window = app.get_webview_window("hud").or_else(|| {
+        if !visible {
+            return None;
+        }
+        tauri::WebviewWindowBuilder::new(
+            app,
+            "hud",
+            tauri::WebviewUrl::App("index.html?hud=1".into()),
+        )
+        .title("Voicewright")
+        .inner_size(300.0, 86.0)
+        .decorations(false)
+        .resizable(false)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .focused(false)
+        .focusable(false)
+        .visible(false)
+        .build()
+        .ok()
+    });
+    if let Some(window) = window {
+        if visible {
+            let _ = window.show();
+        } else {
+            let _ = window.hide();
+        }
+    }
+}
+
 #[tauri::command]
 fn clear_result(state: State<'_, AppState>) {
     let mut inner = state.inner.lock().unwrap();
@@ -1010,7 +1151,14 @@ fn show(app: &AppHandle) {
 }
 
 fn tray(app: &AppHandle) -> tauri::Result<()> {
-    let open = MenuItem::with_id(app, "open", "Voicewright öffnen / Open", true, None::<&str>)?;
+    let open = MenuItem::with_id(app, "open", "Einstellungen / Settings", true, None::<&str>)?;
+    let pause = MenuItem::with_id(
+        app,
+        "pause",
+        "Pause / Fortsetzen · Pause / Resume",
+        true,
+        None::<&str>,
+    )?;
     let stop_item = MenuItem::with_id(app, "stop", "Aufnahme beenden / Stop", true, None::<&str>)?;
     let cancel_item = MenuItem::with_id(
         app,
@@ -1021,12 +1169,19 @@ fn tray(app: &AppHandle) -> tauri::Result<()> {
     )?;
     let copy = MenuItem::with_id(app, "copy", "Text kopieren / Copy", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Beenden / Quit", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&open, &stop_item, &cancel_item, &copy, &quit])?;
+    let menu = Menu::with_items(
+        app,
+        &[&open, &pause, &stop_item, &cancel_item, &copy, &quit],
+    )?;
     let mut tray = TrayIconBuilder::with_id("main")
         .menu(&menu)
         .tooltip("Voicewright")
         .on_menu_event(|app, event| match event.id().as_ref() {
             "open" => show(app),
+            "pause" => {
+                let paused = app.state::<AppState>().inner.lock().unwrap().paused;
+                set_paused(app.clone(), !paused);
+            }
             "stop" => stop(app.state()),
             "cancel" => cancel(app.clone()),
             "copy" => {
@@ -1105,6 +1260,7 @@ pub fn run() {
                 clipboard: Mutex::new(None),
                 output,
                 inner: Mutex::new(Inner {
+                    paused: false,
                     settings,
                     status,
                     capture: None,
@@ -1178,6 +1334,19 @@ pub fn run() {
                 }
                 hotkeys::Backend::Unsupported => {}
             }
+            let visible = {
+                let inner = state.inner.lock().unwrap();
+                desktop_integration::should_show_main(
+                    inner.settings.onboarding_complete,
+                    inner.settings.start_in_background,
+                    state.tray_available.load(Ordering::Relaxed),
+                    inner.status.warning.is_some(),
+                    std::env::args().any(|arg| arg == "--settings"),
+                )
+            };
+            if visible {
+                show(app.handle());
+            }
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -1194,6 +1363,8 @@ pub fn run() {
             status,
             microphones,
             save_settings,
+            set_autostart,
+            set_paused,
             default_settings,
             export_settings,
             import_settings_preview,
@@ -1224,6 +1395,40 @@ mod tests {
     use super::*;
 
     const APP_IDENTIFIER: &str = "de.voicewright.desktop";
+
+    #[test]
+    fn pause_cancels_active_capture_and_invalidates_late_output() {
+        let capture = Arc::new(Capture::default());
+        let mut inner = Inner {
+            paused: false,
+            settings: Settings::default(),
+            status: Status {
+                phase: Phase::Recording,
+                recording_since: Some(Instant::now()),
+                ..Status::default()
+            },
+            capture: Some(capture.clone()),
+            shortcut_error: None,
+            shortcut_active: false,
+            shortcut_state: hotkeys::ShortcutStatus::Unknown,
+            shortcut_detail: None,
+            portal: None,
+            press: HotkeyState::default(),
+            session: 7,
+            started_from_hotkey: true,
+            transfer: None,
+            download: None,
+        };
+        pause_state(&mut inner, true);
+        assert!(inner.paused);
+        assert!(capture.cancelled.load(Ordering::SeqCst));
+        assert!(capture.stop.load(Ordering::SeqCst));
+        assert_ne!(inner.session, 7);
+        assert!(inner.capture.is_none());
+        assert_eq!(inner.status.phase, Phase::Cancelled);
+        pause_state(&mut inner, false);
+        assert!(!inner.paused);
+    }
 
     #[test]
     fn saving_output_permission_does_not_reopen_shortcut_dialogs() {
