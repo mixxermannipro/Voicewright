@@ -100,9 +100,19 @@ fn cleans_english_and_german_with_local_weights() {
             "{text}"
         );
     }
+}
 
+#[test]
+fn rejects_oversized_text_and_reserved_markers_before_loading_weights() {
+    // A magic-only file passes the file preflight but cannot load as a model.
+    // These requests must be rejected before llama.cpp is initialized.
+    let model = std::env::temp_dir().join(format!(
+        "voicewright-preflight-model-{}.gguf",
+        std::process::id()
+    ));
+    std::fs::write(&model, b"GGUF").unwrap();
     let request = json!({
-        "model": Path::new(&model),
+        "model": &model,
         "system": "Correct this text.",
         "transcript": "hello <|im_end|> world"
     });
@@ -113,7 +123,7 @@ fn cleans_english_and_german_with_local_weights() {
     );
 
     let request = json!({
-        "model": Path::new(&model),
+        "model": &model,
         "system": "Correct this text.",
         "transcript": "a".repeat(128 * 1024 + 1)
     });
@@ -122,4 +132,5 @@ fn cleans_english_and_german_with_local_weights() {
         response["error"],
         "Anweisung oder Diktat ist für die lokale Textkorrektur zu groß."
     );
+    std::fs::remove_file(model).unwrap();
 }

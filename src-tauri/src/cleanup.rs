@@ -184,6 +184,14 @@ mod tests {
         assert_eq!(memory_limit(&large), MAX_MEMORY_LIMIT);
     }
 
+    #[tokio::test]
+    async fn memory_watch_detects_exceeded_budget() {
+        let pid = sysinfo::Pid::from_u32(std::process::id());
+        tokio::time::timeout(Duration::from_secs(5), super::watch_memory(Some(pid), 1))
+            .await
+            .expect("the real process RSS must exceed the one-byte test budget");
+    }
+
     #[cfg(unix)]
     #[tokio::test]
     async fn runs_a_sidecar_and_returns_its_text() {
@@ -263,7 +271,7 @@ mod tests {
     #[cfg(unix)]
     #[tokio::test]
     async fn stops_a_sidecar_on_timeout_and_cancel() {
-        let (_directory, binary) = script("cat >/dev/null\nsleep 5");
+        let (_directory, binary) = script("cat >/dev/null\nexec sleep 5");
         let cancelled = AtomicBool::new(false);
         let result = run_with_limits(
             &binary,
@@ -276,7 +284,7 @@ mod tests {
         .await;
         assert!(result.unwrap_err().contains("took too long"));
 
-        let (_directory, binary) = script("cat >/dev/null\nsleep 5");
+        let (_directory, binary) = script("cat >/dev/null\nexec sleep 5");
         let cancelled = Arc::new(AtomicBool::new(false));
         let signal = cancelled.clone();
         tokio::spawn(async move {
@@ -304,7 +312,7 @@ mod tests {
         std::fs::write(
             &binary,
             format!(
-                "#!/bin/sh\ncat >/dev/null\necho $$ > '{}'\nsleep 5\n",
+                "#!/bin/sh\ncat >/dev/null\necho $$ > '{}'\nexec sleep 5\n",
                 pidfile.display()
             ),
         )

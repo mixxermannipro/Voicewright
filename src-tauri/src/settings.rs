@@ -182,11 +182,12 @@ impl Settings {
         Ok(())
     }
 
-    /// The conservative default gets the strict fact-preservation guard.
-    /// A custom prompt may intentionally restructure text, so it only gets
-    /// the hard-fact checks and never silently drops numbers or URLs.
-    pub fn uses_default_prompt(&self) -> bool {
-        self.prompt.trim().is_empty() || self.prompt == DEFAULT_PROMPT
+    /// Minimal with the default instruction preserves words and order.
+    /// Explicit style modes and custom prompts allow rephrasing, but retain
+    /// hard-fact checks. Whitespace cannot silently disable the strict guard.
+    pub fn requires_strict_cleanup(&self) -> bool {
+        self.cleanup_style == CleanupStyle::Minimal
+            && (self.prompt.trim().is_empty() || self.prompt.trim() == DEFAULT_PROMPT.trim())
     }
 
     pub fn system_prompt(&self) -> String {
@@ -303,9 +304,9 @@ mod tests {
         assert!(system.contains("Ticket 4B"));
         settings.prompt = "CUSTOM".into();
         assert!(settings.system_prompt().starts_with("CUSTOM"));
-        assert!(!settings.uses_default_prompt());
+        assert!(!settings.requires_strict_cleanup());
         settings.prompt.clear();
-        assert!(settings.uses_default_prompt());
+        assert!(settings.requires_strict_cleanup());
     }
 
     #[test]
@@ -315,10 +316,18 @@ mod tests {
         assert_eq!(settings.system_prompt(), DEFAULT_PROMPT);
         settings.cleanup_style = CleanupStyle::Natural;
         assert!(settings.system_prompt().contains("Style: natural"));
+        assert!(!settings.requires_strict_cleanup());
         settings.cleanup_style = CleanupStyle::Formal;
         assert!(settings.system_prompt().contains("Style: formal"));
+        assert!(!settings.requires_strict_cleanup());
+        let saved = serde_json::to_string(&settings).unwrap();
+        let restored: Settings = serde_json::from_str(&saved).unwrap();
+        assert_eq!(restored.cleanup_style, CleanupStyle::Formal);
         let old: Settings = serde_json::from_str(r#"{"schema_version":3}"#).unwrap();
         assert_eq!(old.cleanup_style, CleanupStyle::Minimal);
+        settings.cleanup_style = CleanupStyle::Minimal;
+        settings.prompt = format!("  {DEFAULT_PROMPT}\n");
+        assert!(settings.requires_strict_cleanup());
     }
 
     #[test]

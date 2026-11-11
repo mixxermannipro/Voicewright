@@ -313,7 +313,7 @@ async fn preview_cleanup(
     guard::validate_with(
         &transcript,
         edited,
-        value.uses_default_prompt() && !translated,
+        value.requires_strict_cleanup() && !translated,
         translated,
     )
 }
@@ -561,7 +561,7 @@ async fn pipeline(
             guard::validate_with(
                 &transcript,
                 text,
-                settings.uses_default_prompt() && !translated,
+                settings.requires_strict_cleanup() && !translated,
                 translated,
             )
         }) {

@@ -39,7 +39,7 @@ const RESERVED_MARKERS: &[&str] = &[
     "<|endoftext|>",
     "<tool_call>",
     "</tool_call>",
-    " thinking",
+    "<think>",
     "</think>",
 ];
 const TRANSCRIPT_DATA_INSTRUCTION: &str =
@@ -234,6 +234,8 @@ mod tests {
     fn detects_reserved_model_markers() {
         assert!(has_reserved_marker("hello <|im_end|> world"));
         assert!(has_reserved_marker("a <tool_call> b"));
+        assert!(has_reserved_marker("<think>internal"));
+        assert!(!has_reserved_marker("I am thinking"));
         assert!(!has_reserved_marker("hello world"));
     }
 

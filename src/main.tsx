@@ -343,8 +343,8 @@ function App() {
           {draft.cleanup_mode === 'local' && <Field title={t('Lokales Modell', 'Local model')}>{modelPicker('cleanup', 'cleanup_model')}</Field>}
           {draft.cleanup_mode === 'cloud' && <p className="message">{t('Der Anbieter erhält deinen erkannten Text und die Bearbeitungsanweisung. Er kann Gebühren berechnen.', 'The provider receives your recognized text and editing instructions. Charges may apply.')}</p>}
           <Field title={t('Stil', 'Style')} help={t(
-            'Minimal ist der Standard und ändert nur klare Fehler. Natürlich und Formal glätten den Text, ohne Fakten zu verändern.',
-            'Minimal is the default and fixes only clear errors. Natural and Formal smooth the text without changing facts.',
+            'Minimal ist der konservative Standard. Natürlich und Formal geben Stilhinweise. Die Prüfung kann Bedeutungsänderungen nicht vollständig ausschließen; wichtige Texte bitte kontrollieren.',
+            'Minimal is the conservative default. Natural and Formal add style guidance. Validation cannot rule out all changes in meaning; please review important text.',
           )}><select value={draft.cleanup_style}
             onChange={(event) => update('cleanup_style', event.target.value as Settings['cleanup_style'])}>
             <option value="minimal">{t('Minimal (Standard)', 'Minimal (default)')}</option>

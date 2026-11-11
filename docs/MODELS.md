@@ -52,6 +52,11 @@ Die Prüfsummen stammen aus den Dateimetadaten der beiden Kataloge.
 - Eine optionale lokale Textkorrektur benötigt ein zusätzliches Modell. Lass
   Korrektur und Übersetzung ausgeschaltet, wenn du den reinen erkannten Text
   verwenden möchtest.
+- Qwen3-0.6B ist ein optionales Testmodell, keine pauschale Empfehlung für
+  inhaltstreue Bearbeitung. Der DE/EN-Vergleich zeigt auch ausgelassene Fakten
+  und unnötige Kürzungen. Nutze den Original-Fallback und prüfe wichtige Texte.
+  Siehe [lokale Korrektur](LOCAL_CLEANUP.md) und
+  [Prüfprotokoll](LOCAL_CLEANUP_EVALUATION.md).
 
 Nur der Modellkatalog der installierten App bestimmt, welche Dateien direkt
 zum Download angeboten werden. Parakeet-Dateien für ONNX gehören zu einem
