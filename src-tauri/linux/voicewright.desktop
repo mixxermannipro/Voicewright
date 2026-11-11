@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name={{name}}
+Comment=Local offline dictation
+Comment[de]=Lokales Offline-Diktat
+Exec={{exec}}
+Icon={{icon}}
+Terminal=false
+Categories=Office;Utility;
+StartupWMClass=voicewright

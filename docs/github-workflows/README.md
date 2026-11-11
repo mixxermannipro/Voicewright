@@ -1,5 +1,11 @@
 # GitHub Actions aktivieren
 
+**Aktueller Stand (11. November 2026):** Die aktiven und maßgeblichen Abläufe
+liegen bereits unter `.github/workflows/`. Insbesondere ruft `ci.yml` jetzt
+`linux-package.yml` für AppImage/DEB auf. Die folgenden Vorlagen und die
+damalige Aktivierungsanleitung sind historisch; nicht über aktive Workflows
+kopieren oder erneut verschieben.
+
 Die beiden YAML-Dateien in diesem Ordner sind die vollständigen Vorlagen
 für Prüfungen und Vorabversionen. GitHub hat das Schreiben nach
 `.github/workflows/` für die Anmeldedaten dieser Sitzung abgelehnt.

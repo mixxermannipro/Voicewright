@@ -43,3 +43,33 @@ nicht.
 Modelle werden separat bezogen. Ihre Lizenzbedingungen stammen aus den
 jeweiligen Modellkarten und stehen unabhängig von den Lizenzen der
 Ausführungssoftware. Siehe [MODELS.md](MODELS.md).
+
+## Mitgelieferte native Engines / Bundled native engines
+
+Diese Hinweise stammen aus den Quellen der gesperrten Crates
+`whisper-rs-sys 0.15.0` und `llama-cpp-sys-2 0.1.161`.
+These notices cover the bundled whisper.cpp and llama.cpp sources.
+
+whisper.cpp: Copyright (c) 2023-2024 The ggml authors
+
+llama.cpp: Copyright (c) 2023-2026 The ggml authors
+
+MIT License (applies to each engine separately):
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

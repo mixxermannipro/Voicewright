@@ -1,0 +1,16 @@
+# Applies to both independent Cargo projects when invoked from the repository.
+# Do not use target-cpu=native in distributed binaries. GGML's CMake defaults
+# otherwise enable AVX2 even when Rust itself uses the baseline x86-64 target.
+[env]
+GGML_NATIVE = "OFF"
+GGML_AVX = "OFF"
+GGML_AVX2 = "OFF"
+GGML_AVX512 = "OFF"
+GGML_AVX512_VBMI = "OFF"
+GGML_AVX512_VNNI = "OFF"
+GGML_AVX512_BF16 = "OFF"
+GGML_AVX_VNNI = "OFF"
+GGML_FMA = "OFF"
+GGML_F16C = "OFF"
+GGML_BMI2 = "OFF"
+GGML_SSE42 = "OFF"

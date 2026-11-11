@@ -55,6 +55,33 @@ vollständiger DEB-Durchlauf mit diesem Branch. Die Ergebnisse stehen in
 [PLATFORM_SUPPORT.md](PLATFORM_SUPPORT.md); die manuellen Schritte in
 [TESTING.md](TESTING.md).
 
+## Linux-Paketierung (Issue #32, 11. November 2026)
+
+Der Paketbau bleibt bei Tauri und läuft als zusätzlicher Pflicht-Check bereits
+für PRs auf Ubuntu 22.04. AppImage (für Fedora priorisiert) und DEB enthalten
+AppStream-Metadaten, Desktop-Eintrag, Icons, Cleanup-Sidecar und Lizenzhinweise.
+Der Prüfer kontrolliert Layout, Dateirechte, dynamische Bibliotheken und
+GLIBC ≤ 2.35 für enthaltene ELF-Dateien. SHA-256 und Prüfbericht liegen beim
+Actions-Artefakt. Der Releaseablauf übernimmt dieselben geprüften Linux-Pakete.
+GGML baut ohne native/AVX-Anforderungen; der Sidecar-Paketcache ist von alten
+AVX-Builds getrennt. Der X11-Smoke unterstützt nun auch AppImage.
+
+**Lokal nachgewiesen:** npm-Typprüfung, Lint, Tests, Webbuild und Audit (0
+Schwachstellen); beide Rust-fmt-/Clippy-Prüfungen, 78 App-/Parser-Tests und
+6 Engine-/Protokolltests; je ein echter Modelltest blieb ohne Gewichte
+übersprungen. Python-Paketprüfertests, AppStream und actionlint bestanden. Release-DEB
+und AppImage wurden auf Fedora 45 gebaut. Das Fedora-AppImage benötigt GLIBC
+2.44; der Prüfer hat die portable Grenze korrekt abgewiesen. Mit expliziter
+lokaler Grenze 2.44 bestanden Layout, Laufzeiten und 202 ELF-Prüfungen.
+Dies ist **kein** Distributionsnachweis für Ubuntu/Debian. Endgültige Ergebnisse
+und Prüfsummen werden im [Linux-Protokoll](LINUX_RELEASE_TESTS.md) ergänzt.
+
+**Offen:** reale Installation/Updates auf fremden Distributionen, physisches
+Mikrofon, GNOME/KDE-/Wayland-Abnahme und vollständige Lizenzprüfung aller
+gebündelten Systembibliotheken. Kein bit-identisches Buildversprechen.
+Issue #16 ist eine separate, parallel laufende Cleanup-Arbeit und wird durch
+diese Paketänderungen nicht als erledigt erklärt.
+
 ## Prompt-Härtung – Implementierung in Issue #17
 
 Auf einem separaten Feature-Branch liegt eine erweiterte Standardanweisung,
@@ -189,4 +216,3 @@ Es enthält konkrete Restrisiken und Sicherheits-Regressionen S01–S10.
 Security-Test oder abgeschlossener Audit.** Ohne reale OS-/Netzwerktests,
 Paket-Signierung und Nachweise für Hochrisiken bleibt Issue #27 ein
 Release-Blocker.
-

@@ -11,3 +11,4 @@ ggml-*.bin
 .env
 .env.*
 .DS_Store
+__pycache__/

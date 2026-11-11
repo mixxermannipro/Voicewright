@@ -3,6 +3,8 @@ name = "voicewright"
 version = "0.1.0-alpha.1"
 edition = "2021"
 license = "MIT"
+authors = ["Voicewright contributors"]
+homepage = "https://github.com/mixxermannipro/Voicewright"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

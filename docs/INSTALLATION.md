@@ -51,6 +51,37 @@ entbehrlich. Windows verwendet die WebView2-Laufzeit. Linux nutzt
 Systembibliotheken, die je nach Paket und Distribution vorhanden sein müssen.
 Für Paketwarnungen und Signaturen siehe [RELEASE.md](RELEASE.md).
 
+### Linux: Fedora, Ubuntu und Debian
+
+Für Fedora ist **AppImage** vorgesehen, nicht DEB. Nach dem Download:
+
+```sh
+sha256sum --check SHA256SUMS.txt --ignore-missing
+chmod u+x Voicewright_*.AppImage
+./Voicewright_*.AppImage
+```
+
+Falls FUSE fehlt: `./Voicewright_*.AppImage --appimage-extract-and-run`.
+Das Paket und das Diktieren **niemals mit sudo** starten. Modelle und
+Einstellungen bleiben im privaten XDG-Datenordner des angemeldeten Nutzers;
+ein Paketupdate ersetzt sie nicht. Modellgewichte sind nicht im Paket.
+Für ein Update die alte App beenden, die neue Datei prüfen und ersetzen.
+Die AppImage-Datei zu entfernen löscht keine persönlichen Modelle.
+
+Ubuntu/Debian installieren das DEB mit `sudo apt install ./Voicewright_*.deb`.
+Updates erfolgen genauso. Nur die Paketinstallation braucht erhöhte Rechte,
+nicht der App-Start. Unter KDE/GNOME müssen Audio, Sitzung-D-Bus und ein
+Secret Service verfügbar sein. Ohne Schlüsselverwaltung bleibt lokale
+Erkennung nutzbar; API-Schlüssel werden nicht ersatzweise in Dateien gespeichert.
+
+Der offizielle Linux-Bau verwendet Ubuntu 22.04 (GLIBC höchstens 2.35),
+GTK 3 und WebKitGTK 4.1. AppImage bündelt Bibliotheken, aber nicht Kernel,
+GLIBC, Audio-/Desktopdienste oder Modelle. Ubuntu 22.04/24.04, Debian 12/13
+und Fedora 45 sind **Testziele, keine pauschal bestätigte Freigabe**.
+Prüfstatus und Updateprotokoll: [Linux-Abnahme](LINUX_RELEASE_TESTS.md).
+Automatischer Systemstart ist nicht implementiert (Issue #8); es wird kein
+systemd-Dienst und kein Autostart-Eintrag angelegt.
+
 ## Aus Quellcode starten
 
 Der Paketbau verwendet Node.js 24 und Rust 1.99.1. Zusätzlich brauchst du
@@ -76,3 +107,8 @@ npm run tauri -- dev
 
 `prepare:engine` baut die mitgelieferte Textkorrektur für deinen Rechner.
 Für ein Installationspaket nutze `npm run tauri -- build`.
+Für Linux gezielt `npm run tauri -- build --bundles appimage,deb -- --locked`.
+Eigene Fedora-Builds können eine neuere GLIBC erfordern und ersetzen nicht
+die auf Ubuntu 22.04 gebauten Distributionspakete. Die CPU-Basis wird in
+`.cargo/config.toml` für beide unabhängigen Cargo-Projekte festgelegt;
+keine `native`-/AVX-Overrides für weitergegebene Pakete verwenden.

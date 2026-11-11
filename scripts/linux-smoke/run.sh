@@ -2,7 +2,7 @@
 # Run only in an isolated Linux test container. Uses synthetic microphone audio and a private X11 display.
 set -euo pipefail
 if [[ $# != 3 && $# != 4 ]]; then
-  echo "Usage: $0 PACKAGE.deb WHISPER-BASE.bin GERMAN-48000-STEREO-S16LE.raw [QWEN3.gguf]" >&2
+  echo "Usage: $0 PACKAGE.deb|PACKAGE.AppImage WHISPER-BASE.bin GERMAN-48000-STEREO-S16LE.raw [QWEN3.gguf]" >&2
   exit 2
 fi
 package=$(realpath "$1")
@@ -24,8 +24,20 @@ if [[ -n "$cleanup_model" ]]; then
   cp "$cleanup_model" "$app_data/models/Qwen3-0.6B-Q8_0.gguf"
   printf '%s\n' '{"speech_language":"de","cleanup_mode":"local","fallback":false,"recording_mode":"toggle","translation":"English"}' >"$app_data/settings.json"
 fi
-dpkg-deb -x "$package" "$work/package"
-test -x "$work/package/usr/bin/voicewright-cleanup"
+case "$package" in
+  *.deb)
+    dpkg-deb -x "$package" "$work/package"
+    launcher="$work/package/usr/bin/voicewright"
+    ;;
+  *.AppImage)
+    (cd "$work/package" && "$package" --appimage-extract >/dev/null)
+    work_package="$work/package/squashfs-root"
+    launcher="$work_package/AppRun"
+    test -x "$work_package/usr/bin/voicewright-cleanup"
+    ;;
+  *) echo "Expected .deb or .AppImage" >&2; exit 2 ;;
+esac
+if [[ "$package" == *.deb ]]; then test -x "$work/package/usr/bin/voicewright-cleanup"; fi
 cc "$fixture_dir/probe.c" $(pkg-config --cflags --libs gtk+-3.0) -o "$work/probe"
 cat >"$ALSA_CONFIG_PATH" <<'ALSA'
 pcm.!default {
@@ -46,7 +58,7 @@ pulseaudio -n --daemonize=true --exit-idle-time=-1 \
 pactl set-default-source voicewright
 
 start=$(date +%s%N)
-"$work/package/usr/bin/voicewright" >"$work/app.log" 2>&1 &
+"$launcher" >"$work/app.log" 2>&1 &
 app=$!
 if ! timeout 30 xdotool search --sync --onlyvisible --name '^Voicewright$' >/dev/null; then
   cat "$work/app.log" >&2
