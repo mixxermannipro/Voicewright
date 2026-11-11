@@ -44,6 +44,7 @@ export type Settings = {
   spoken_formatting: boolean;
   fallback: boolean;
   auto_insert: boolean;
+  wayland_insertion_consent: boolean;
   shortcut: string;
   cancel_shortcut: string;
   recording_mode: 'hold' | 'toggle';
@@ -54,11 +55,13 @@ export type Settings = {
 export type ShortcutBackend = 'native' | 'x11' | 'portal' | 'unsupported';
 export type ShortcutState = 'unknown' | 'pending' | 'active' | 'denied' | 'unavailable' | 'error';
 export type SessionType = 'x11' | 'wayland' | 'other';
+export type InsertionState = 'unavailable' | 'disabled' | 'pending' | 'ready' | 'denied' | 'error';
 export type Initial = {
   settings: Settings; catalog: Model[];
   hardware: { cpu: string; threads: number; ram: number };
   shortcut_backend: ShortcutBackend; shortcut_state: ShortcutState;
   insertion_supported: boolean; insertion_detail: string | null; session_type: SessionType;
+  insertion_state: InsertionState;
   tray_available: boolean; model_path: string; default_prompt: string;
 };
 export type Phase = 'idle' | 'recording' | 'transcribing' | 'cleaning' | 'inserting' | 'completed' | 'cancelled' | 'failed';
@@ -66,6 +69,7 @@ export type Status = {
   phase: Phase; elapsed_ms: number; level: number; transcript: string | null; warning: string | null;
   inserted: boolean; shortcut_error: string | null; shortcut_detail: string | null;
   shortcut_active: boolean; shortcut_state: ShortcutState; installed: string[];
+  insertion_state: InsertionState; insertion_detail: string | null;
   download: { id: string; received: number; total: number; active: boolean; error: string | null } | null;
 };
 

@@ -107,6 +107,10 @@ pub struct Client {
     sequence: u32,
 }
 
+pub fn available() -> Result<(), &'static str> {
+    Api::load().map(|_| ())
+}
+
 impl Client {
     pub fn new(fd: OwnedFd) -> Result<Self, &'static str> {
         let api = Api::load()?;
@@ -199,17 +203,7 @@ impl Client {
         target_ready: impl Fn() -> bool,
     ) -> Result<(), &'static str> {
         let text = prepare_text(text, cancelled)?;
-        let deadline = Instant::now() + Duration::from_secs(5);
-        while !self.ready {
-            self.poll()?;
-            if cancelled.load(Ordering::Relaxed) {
-                return Err("Text output cancelled");
-            }
-            if Instant::now() >= deadline {
-                return Err("Desktop Unicode text device was not ready");
-            }
-            std::thread::sleep(Duration::from_millis(5));
-        }
+        self.wait_ready(cancelled)?;
         self.poll()?;
         if !self.ready || cancelled.load(Ordering::Relaxed) || !target_ready() {
             return Err("Text output cancelled or test target not focused");
@@ -233,6 +227,25 @@ impl Client {
             self.poll()?;
             if Instant::now() >= deadline || cancelled.load(Ordering::Relaxed) {
                 return Err("Output may already be present; acknowledgement interrupted");
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        Ok(())
+    }
+
+    pub fn is_ready(&self) -> bool {
+        self.ready
+    }
+
+    pub fn wait_ready(&mut self, cancelled: &AtomicBool) -> Result<(), &'static str> {
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while !self.is_ready() {
+            self.poll()?;
+            if cancelled.load(Ordering::Relaxed) {
+                return Err("Text output cancelled");
+            }
+            if Instant::now() >= deadline {
+                return Err("Desktop Unicode text device was not ready");
             }
             std::thread::sleep(Duration::from_millis(5));
         }

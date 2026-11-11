@@ -2,13 +2,13 @@
 
 ## Stand / Status
 
-**Nativer Unicode-Einfügenachweis bestanden; App-Integration folgt.**
+**Nativer Unicode-Einfügenachweis bestanden; Ausgabebackend integriert.**
 Der Modus `utf8` überträgt über eine ausdrücklich freigegebene EIS-Sitzung
 reinen Text. Ein natives GTK-Wayland-Testfeld erhielt den öffentlichen
 45-Zeichen-Test inklusive Groß-/Kleinschreibung, Umlauten, ß, Emoji und Absatz
 exakt. Die normale App ist damit noch nicht vollständig abgenommen.
 
-**Native Unicode insertion proven; app integration is next.** A native GTK
+**Native Unicode insertion proven; output backend integrated.** A native GTK
 Wayland field received the exact 45-character public test including case,
 umlauts, ß, emoji and a paragraph. This is not full app acceptance.
 
@@ -141,6 +141,21 @@ CI uses `--all-targets` so the example tests run, rather than merely compile.
 The final local run included all model tests: 107 app/example tests and
 10 cleanup tests passed, with no ignored tests skipped. This is still not
 a successful native Wayland insertion test.
+
+## App-Integration / Application integration
+
+`wayland_insertion_consent` bleibt standardmäßig aus und wird bei Import
+zurückgesetzt. Die App fragt ausschließlich nach bewusster Aktivierung bzw.
+bei einem späteren Start mit gespeicherter Einwilligung nach Keyboard-only-
+Freigabe. Sie liest/speichert keine Restore-Tokens. Bereitschaft wird erst
+nach erfolgreicher EIS-Textgeräteverhandlung gemeldet. Widerruf, Verbindungs-
+verlust, Abbruch und alte Sitzungen werden kontrolliert; kein automatischer
+Wiederholversuch nach möglicherweise bereits versandtem Text.
+
+Consent defaults off and resets on import. Ready requires actual EIS TEXT
+device negotiation, not merely portal detection. No restore tokens, implicit
+permission requests during dictation, automatic uncertain-output retries or
+clipboard changes. Native app microphone tests never output externally.
 
 ## Quellen / Sources
 

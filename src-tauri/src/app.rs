@@ -3,7 +3,7 @@ use crate::{
     cleanup, guard, hotkeys, insertion, models, providers,
     session::{apply_shortcut_changes, Action, HotkeyState, Phase, ShortcutKind, Status},
     settings::{self, CleanupMode, RecordingMode, Settings},
-    settings_portable, speech, spoken_format,
+    settings_portable, speech, spoken_format, wayland_output,
 };
 use serde::Serialize;
 use std::{
@@ -18,7 +18,7 @@ use std::{
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
-    AppHandle, Manager, State, WindowEvent,
+    AppHandle, Emitter, Manager, State, WindowEvent,
 };
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
@@ -28,6 +28,7 @@ struct AppState {
     hardware: Hardware,
     tray_available: AtomicBool,
     clipboard: Mutex<Option<arboard::Clipboard>>,
+    output: wayland_output::Controller,
     inner: Mutex<Inner>,
 }
 
@@ -92,6 +93,8 @@ struct StatusView {
     shortcut_detail: Option<String>,
     shortcut_active: bool,
     shortcut_state: hotkeys::ShortcutStatus,
+    insertion_state: wayland_output::OutputState,
+    insertion_detail: Option<String>,
     download: Option<Download>,
     installed: Vec<String>,
 }
@@ -113,7 +116,8 @@ struct Initial {
     shortcut_backend: hotkeys::Backend,
     shortcut_state: hotkeys::ShortcutStatus,
     insertion_supported: bool,
-    insertion_detail: Option<&'static str>,
+    insertion_detail: Option<String>,
+    insertion_state: wayland_output::OutputState,
     session_type: insertion::SessionKind,
     tray_available: bool,
     model_path: PathBuf,
@@ -123,14 +127,16 @@ struct Initial {
 #[tauri::command]
 fn initial(state: State<'_, AppState>) -> Initial {
     let inner = state.inner.lock().unwrap();
+    let output = output_status(&state);
     Initial {
         settings: inner.settings.clone(),
         catalog: models::CATALOG,
         hardware: state.hardware.clone(),
         shortcut_backend: hotkeys::backend(),
         shortcut_state: inner.shortcut_state,
-        insertion_supported: insertion::automatic_supported(),
-        insertion_detail: insertion::unavailable_reason(),
+        insertion_supported: output.state == wayland_output::OutputState::Ready,
+        insertion_detail: output.detail,
+        insertion_state: output.state,
         session_type: insertion::session_kind(),
         tray_available: state.tray_available.load(Ordering::Relaxed),
         model_path: state.models(),
@@ -141,6 +147,7 @@ fn initial(state: State<'_, AppState>) -> Initial {
 #[tauri::command]
 fn status(state: State<'_, AppState>) -> StatusView {
     let inner = state.inner.lock().unwrap();
+    let output = output_status(&state);
     StatusView {
         phase: inner.status.phase,
         elapsed_ms: inner
@@ -157,9 +164,45 @@ fn status(state: State<'_, AppState>) -> StatusView {
         shortcut_detail: inner.shortcut_detail.clone(),
         shortcut_active: inner.shortcut_active,
         shortcut_state: inner.shortcut_state,
+        insertion_state: output.state,
+        insertion_detail: output.detail,
         download: inner.download.clone(),
         installed: models::installed(&state.models()),
     }
+}
+
+fn output_status(state: &AppState) -> wayland_output::Snapshot {
+    if insertion::session_kind() == insertion::SessionKind::Wayland {
+        state.output.snapshot()
+    } else {
+        wayland_output::Snapshot {
+            state: if insertion::automatic_supported() {
+                wayland_output::OutputState::Ready
+            } else {
+                wayland_output::OutputState::Unavailable
+            },
+            detail: insertion::unavailable_reason().map(str::to_owned),
+        }
+    }
+}
+
+#[tauri::command]
+fn request_insertion_permission(state: State<'_, AppState>) -> Result<(), String> {
+    let inner = state.inner.lock().unwrap();
+    if inner.status.phase.busy() {
+        return Err("Finish dictation before requesting desktop permission.".into());
+    }
+    if !inner.settings.wayland_insertion_consent {
+        return Err("Enable and save explicit Wayland output consent first.".into());
+    }
+    drop(inner);
+    state.output.request_permission();
+    Ok(())
+}
+
+#[tauri::command]
+fn disable_insertion_permission(state: State<'_, AppState>) {
+    state.output.disconnect();
 }
 
 #[tauri::command]
@@ -211,6 +254,7 @@ fn save_settings(
     }
     let backend = hotkeys::backend();
     let native = matches!(backend, hotkeys::Backend::X11 | hotkeys::Backend::Native);
+    let rebind_portal = should_rebind_shortcuts(&inner.settings, &value);
     let previous = if native && inner.shortcut_active {
         shortcuts(&inner.settings)
     } else {
@@ -231,6 +275,10 @@ fn save_settings(
         }
         return Err(error);
     }
+    let request_output = value.auto_insert
+        && value.wayland_insertion_consent
+        && !inner.settings.wayland_insertion_consent;
+    let disable_output = !value.auto_insert || !value.wayland_insertion_consent;
     inner.settings = value;
     inner.press.reset();
     match backend {
@@ -241,13 +289,15 @@ fn save_settings(
             inner.shortcut_state = hotkeys::ShortcutStatus::Active;
         }
         hotkeys::Backend::Portal => {
-            if let Some(portal) = &inner.portal {
-                portal.rebind(hotkeys::bindings(&inner.settings));
+            if rebind_portal {
+                if let Some(portal) = &inner.portal {
+                    portal.rebind(hotkeys::bindings(&inner.settings));
+                }
+                inner.shortcut_error = None;
+                inner.shortcut_detail = None;
+                inner.shortcut_active = false;
+                inner.shortcut_state = hotkeys::ShortcutStatus::Pending;
             }
-            inner.shortcut_error = None;
-            inner.shortcut_detail = None;
-            inner.shortcut_active = false;
-            inner.shortcut_state = hotkeys::ShortcutStatus::Pending;
         }
         hotkeys::Backend::Unsupported => {
             inner.shortcut_error = None;
@@ -256,7 +306,17 @@ fn save_settings(
             inner.shortcut_state = hotkeys::ShortcutStatus::Unavailable;
         }
     }
+    drop(inner);
+    if disable_output {
+        state.output.disconnect();
+    } else if request_output {
+        state.output.request_permission();
+    }
     Ok(())
+}
+
+fn should_rebind_shortcuts(before: &Settings, after: &Settings) -> bool {
+    hotkeys::bindings(before) != hotkeys::bindings(after)
 }
 
 #[tauri::command]
@@ -385,6 +445,12 @@ async fn import_settings_preview(app: AppHandle) -> Result<Option<Settings>, Str
     .await
 }
 
+#[derive(Clone, Copy)]
+enum OutputTarget {
+    Native(insertion::Target),
+    Wayland,
+}
+
 fn start_session(app: &AppHandle, from_hotkey: bool) -> Result<(), String> {
     let state = app.state::<AppState>();
     let mut inner = state.inner.lock().unwrap();
@@ -397,8 +463,16 @@ fn start_session(app: &AppHandle, from_hotkey: bool) -> Result<(), String> {
     let settings = inner.settings.clone();
     let root = state.models();
     let speech_model = models::ready(&root, &settings.speech_model)?;
-    let target = if from_hotkey && settings.auto_insert && insertion::automatic_supported() {
-        insertion::target()
+    let target = if from_hotkey && settings.auto_insert {
+        if insertion::session_kind() == insertion::SessionKind::Wayland {
+            (settings.wayland_insertion_consent
+                && state.output.snapshot().state == wayland_output::OutputState::Ready)
+                .then_some(OutputTarget::Wayland)
+        } else if insertion::automatic_supported() {
+            insertion::target().map(OutputTarget::Native)
+        } else {
+            None
+        }
     } else {
         None
     };
@@ -493,7 +567,7 @@ async fn pipeline(
     settings: &Settings,
     model_root: &Path,
     speech_model: &Path,
-    target: Option<insertion::Target>,
+    target: Option<OutputTarget>,
     control: Arc<Capture>,
     session: u64,
 ) -> Result<(), String> {
@@ -591,10 +665,15 @@ async fn pipeline(
             return Ok(());
         }
         let capture = control.clone();
-        let inserted = blocking(move || {
-            insertion::insert(target, &result, &capture.cancelled).map_err(str::to_owned)
-        })
-        .await;
+        let inserted = match target {
+            OutputTarget::Native(target) => {
+                blocking(move || {
+                    insertion::insert(target, &result, &capture.cancelled).map_err(str::to_owned)
+                })
+                .await
+            }
+            OutputTarget::Wayland => state.output.insert(result.clone(), capture).await,
+        };
         let mut inner = state.inner.lock().unwrap();
         if inner.session != session {
             return Ok(());
@@ -607,9 +686,13 @@ async fn pipeline(
         let message = if !settings.auto_insert {
             "The result is available to copy in Voicewright."
         } else {
-            insertion::unavailable_reason().unwrap_or(
+            if insertion::session_kind() == insertion::SessionKind::Wayland {
+                "Wayland output permission is not ready. The result is available to copy."
+            } else {
+                insertion::unavailable_reason().unwrap_or(
                 "The target window could not be verified. The result is available to copy in Voicewright.",
             )
+            }
         };
         append_warning(&mut warning, message.into());
     }
@@ -1006,6 +1089,8 @@ pub fn run() {
                 }
             };
             let system = sysinfo::System::new_all();
+            let (output, mut output_events) = wayland_output::start();
+            let request_output = settings.auto_insert && settings.wayland_insertion_consent;
             app.manage(AppState {
                 root,
                 hardware: Hardware {
@@ -1018,6 +1103,7 @@ pub fn run() {
                 },
                 tray_available: AtomicBool::new(false),
                 clipboard: Mutex::new(None),
+                output,
                 inner: Mutex::new(Inner {
                     settings,
                     status,
@@ -1035,6 +1121,15 @@ pub fn run() {
                 }),
             });
             let state = app.state::<AppState>();
+            let event_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                while let Some(snapshot) = output_events.recv().await {
+                    let _ = event_handle.emit("insertion-status", snapshot);
+                }
+            });
+            if request_output {
+                state.output.request_permission();
+            }
             state
                 .tray_available
                 .store(tray(app.handle()).is_ok(), Ordering::Relaxed);
@@ -1103,6 +1198,8 @@ pub fn run() {
             export_settings,
             import_settings_preview,
             retry_shortcuts,
+            request_insertion_permission,
+            disable_insertion_permission,
             preview_cleanup,
             start_test,
             stop,
@@ -1127,6 +1224,16 @@ mod tests {
     use super::*;
 
     const APP_IDENTIFIER: &str = "de.voicewright.desktop";
+
+    #[test]
+    fn saving_output_permission_does_not_reopen_shortcut_dialogs() {
+        let before = Settings::default();
+        let mut after = before.clone();
+        after.wayland_insertion_consent = true;
+        assert!(!should_rebind_shortcuts(&before, &after));
+        after.shortcut = "Ctrl+Alt+D".into();
+        assert!(should_rebind_shortcuts(&before, &after));
+    }
 
     #[test]
     fn moves_legacy_app_data_only_when_the_new_directory_is_absent() {

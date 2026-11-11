@@ -71,6 +71,7 @@ pub struct Settings {
     pub spoken_formatting: bool,
     pub fallback: bool,
     pub auto_insert: bool,
+    pub wayland_insertion_consent: bool,
     pub shortcut: String,
     pub cancel_shortcut: String,
     pub recording_mode: RecordingMode,
@@ -99,6 +100,7 @@ impl Default for Settings {
             spoken_formatting: false,
             fallback: true,
             auto_insert: true,
+            wayland_insertion_consent: false,
             shortcut: "Ctrl+Shift+Space".into(),
             cancel_shortcut: String::new(),
             recording_mode: RecordingMode::Hold,
@@ -215,6 +217,20 @@ impl Settings {
             ),
         }
         prompt
+    }
+}
+
+#[cfg(test)]
+mod output_consent_tests {
+    use super::*;
+
+    #[test]
+    fn legacy_settings_never_imply_wayland_output_permission() {
+        let settings: Settings = serde_json::from_str("{}").unwrap();
+        assert_eq!(
+            serde_json::to_value(settings).unwrap()["wayland_insertion_consent"],
+            false
+        );
     }
 }
 

@@ -68,6 +68,9 @@ mod linux {
         if !matches!(mode.as_str(), "permission" | "keysym" | "utf8") {
             return Err("Use permission (no input), keysym or utf8 (fixed public test). Clipboard transport is not verified yet.");
         }
+        if mode == "utf8" {
+            crate::eis_text::available()?;
+        }
         let remote = RemoteDesktop::new()
             .await
             .map_err(|_| "RemoteDesktop portal unavailable")?;

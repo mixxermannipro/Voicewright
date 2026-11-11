@@ -58,7 +58,12 @@ natives GTK-Wayland-Testfeld kam exakt an (45 Zeichen, inklusive Umlaute,
 bestand den exakten Vergleich nicht und wird nicht der V1-Transport.
 Der gewählte Weg benötigt `libei >= 1.6`, fordert nur Textfähigkeit an und
 fasst die Zwischenablage nicht an. Acht Prüfer-/Texttests bestanden.
-App-Integration und vollständige Paket-/Desktopabnahme sind noch offen;
+Die App-Integration verwendet nun denselben EIS-Textkanal mit gesonderter
+Einwilligung (Standard aus), begrenzter Warteschlange, Abbruchflag und
+Sitzungsgeneration. Veraltete Freigaben dürfen Ausgabe nicht wieder aktivieren;
+Imports übernehmen keine Einwilligung. Pending/Ready/Denied/Error werden
+an die Oberfläche gemeldet. Mikrofontests geben niemals extern aus.
+Die vollständige Paket-/Desktopabnahme ist noch offen;
 kein Copy-only-Release und keine Issue-Schließung aus der Vorprüfung ableiten.
 
 **Abschlussprüfung des Zwischenstands:** 107 App-/Beispieltests und 10
@@ -68,7 +73,9 @@ Gewichte bestanden, ohne übersprungene Tests. Beide fmt-/Clippy-Prüfungen,
 Python-Paketprüfertests bestanden. CI und gesicherte CI-Vorlage verwenden
 für die App jetzt `--all-targets`, da der vorherige Aufruf die vier neuen
 Example-Tests nicht ausführte. Eine unabhängige Codeprüfung war wegen des
-DeepSeek-Gratislimits nicht verfügbar; nur Selbstprüfung, keine Merge-Freigabe.
+DeepSeek-Gratislimits nicht verfügbar; nur Selbstprüfung, keine unabhängige
+Merge-Freigabe. Der anschließende GitHub-Lauf scheiterte vor dem Codebau an
+Timeouts beim Azure-Ubuntu-Paketserver; das ist kein nachgewiesener Rustfehler.
 
 Der Alpha-Stand aus [PR #1](https://github.com/mixxermannipro/Voicewright/pull/1)
 wurde am 7. November 2026 nach `main` integriert. Der Zweig

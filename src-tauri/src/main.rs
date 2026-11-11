@@ -3,6 +3,8 @@
 mod app;
 mod audio;
 mod cleanup;
+#[cfg(target_os = "linux")]
+mod eis_text;
 mod guard;
 mod hotkeys;
 mod insertion;
@@ -13,6 +15,7 @@ mod settings;
 mod settings_portable;
 mod speech;
 mod spoken_format;
+mod wayland_output;
 
 fn main() {
     app::run();
