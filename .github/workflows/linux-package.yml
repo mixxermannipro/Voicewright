@@ -40,7 +40,8 @@ jobs:
           key: linux-jammy-${{ hashFiles('rust-toolchain.toml', '**/Cargo.lock', '.cargo/config.toml', '.github/workflows/linux-package.yml') }}
       - name: Build and validate release packages (no publication)
         run: |
-          export SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)"
+          SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)"
+          export SOURCE_DATE_EPOCH
           npm ci
           npm test -- scripts/linux-packaging.test.mjs
           python3 -m unittest discover -s scripts -p 'test_linux_bundle.py'
