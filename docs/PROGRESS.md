@@ -1,5 +1,49 @@
 # Arbeitsstand und Übergabe
 
+## V1 für Fedora – Planung am 11. November 2026
+
+`main` wurde auf `a62cd84` aktualisiert; die neue Aufgabe läuft auf
+`feat/v1-fedora-release`. Der Anwender fordert automatisches Einfügen auch
+unter Fedora Wayland ausdrücklich als Pflichtfunktion. Der
+[V1-Entwurf](superpowers/specs/2026-11-11-v1-fedora-design.md) ist vom Anwender
+freigegeben; der [Implementierungsplan](superpowers/plans/2026-11-11-v1-fedora.md)
+ist ebenfalls bestätigt und wird ohne weitere Umfangsfragen umgesetzt.
+Es wurde noch kein V1-Produktcode implementiert und kein Release
+erstellt. Issues werden erst nach der Umsetzung abgeglichen, nicht zur
+Arbeitsauswahl verwendet. Die vorhandene unversionierte
+`.github/workflows/platforms.yml` bleibt unangetastet.
+
+**Ausgangsstand lokal geprüft:** `npm run check`, `npm run lint`, `npm test`
+(12 Tests), `npm run build` und `npm audit --audit-level=high` (0 Treffer)
+bestanden. Beide Cargo-Projekte bestanden Formatierung und Clippy mit
+`--all-targets -- -D warnings`; App/Parser: 96 Tests bestanden, zwei
+Modelltests übersprungen; Cleanup/Protokoll: 9 bestanden, ein Modelltest
+übersprungen. 7 Python-Paketprüfertests und die 6 gezielt erneut ausgeführten
+Vitest-Paketvertragstests bestanden. Ein vorheriger Aufruf der Vitest-Datei
+mit dem Node-Testläufer war ein falscher Prüfaufruf, kein Produktfehler.
+
+**Umgebung:** Fedora 45 KDE Plasma 6.8.2, Wayland. Das lokale Desktop-Portal
+meldet RemoteDesktop v2, Clipboard v1 und GlobalShortcuts v2. Nur die
+Schnittstellen wurden ausgelesen; keine neue Berechtigung erteilt und kein
+automatisches Einfügen nachgewiesen. GitHub-CI-Lauf
+[43030588241](https://github.com/mixxermannipro/Voicewright/actions/runs/43030588241)
+ist für `a62cd84` erfolgreich. Das ist keine praktische V1-/Fedora-Abnahme.
+
+**Bestätigte Produktentscheidungen:** Ausgabe unter Wayland ins aktuell aktive
+Feld; erneute Freigabe beim App-Start ist akzeptiert. Die beiden kostenlosen
+Katalogmodelle dürfen außerhalb Git heruntergeladen und geprüft werden.
+RPM/AppImage, Fünf-Bereiche-Oberfläche und die Abnahmebedingungen sind
+freigegeben. Drei DeepSeek-Helferprüfungen wurden geliefert; zwei weitere
+Wayland-Recherchen scheiterten am kostenlosen Nutzungslimit. Diese Prüfung
+übernimmt der Haupt-Agent ohne bezahltes Ersatzmodell.
+
+**Echte Modelltests dieses Ausgangsstands:** Beide Kataloggewichte wurden
+nach ausdrücklicher Zustimmung außerhalb Git geladen; Dateigröße und SHA-256
+stimmen. Der Whisper-Test mit synthetischen DE/EN-WAVs (7,87 s), der
+Qwen-DE/EN-Protokolltest (8,10 s) und der 19-Fälle-Guard-Vergleich (24,81 s)
+bestanden. Keine echte Mikrofon-/Wayland-Ausgabeabnahme und kein Nachweis
+eines allgemeinen Korrekturvorteils daraus ableiten.
+
 Der Alpha-Stand aus [PR #1](https://github.com/mixxermannipro/Voicewright/pull/1)
 wurde am 7. November 2026 nach `main` integriert. Der Zweig
 `feat/dictation-foundation` ist damit abgeschlossen. Die nächsten Aufgaben
