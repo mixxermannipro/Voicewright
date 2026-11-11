@@ -123,8 +123,8 @@ export function FirstRunGuide({
           t('macOS: Systemeinstellungen → Datenschutz & Sicherheit → Mikrofon. Voicewright erlauben.',
             'macOS: System Settings → Privacy & Security → Microphone. Allow Voicewright.') :
           operatingSystem === 'linux' ?
-            t('Linux: Mikrofon in der Audioverwaltung auswählen. Auf Wayland erfolgt das Diktat über das App-Fenster.',
-              'Linux: Select the microphone in your audio controls. On Wayland, dictate using the app window.') :
+            t('Linux: Mikrofon in der Audioverwaltung auswählen. Auf Wayland hängt die globale Taste von der Freigabe deines Desktops ab; alternativ startest du das Diktat im App-Fenster.',
+              'Linux: Select the microphone in your audio controls. On Wayland, global shortcuts depend on your desktop approval; alternatively, start dictation in the app window.') :
             t('Prüfe in den Systemeinstellungen, ob die App auf das Mikrofon zugreifen darf.',
               'Check your OS privacy settings to allow microphone access.')}</p>
       {settings.cleanup_mode === 'cloud' && <p className="message error" role="alert">{t(
@@ -159,6 +159,9 @@ export function FirstRunGuide({
       {globalSupported && status?.shortcut_active ? <p>{t(
         'Öffne ein beliebiges normales Textfeld in einer anderen App. Setze den Cursor dort und diktiere per globalem Tastenkürzel. Bei fehlender Einfügeunterstützung kannst du das Ergebnis in Voicewright kopieren.',
         'Open a normal text field in another app. Focus it and dictate with the global shortcut. If automatic insertion is unavailable, copy the result from Voicewright.',
+      )}</p> : status?.shortcut_state === 'pending' ? <p>{t(
+        'Dein Desktop fragt gerade die Freigabe für globale Tastenkürzel an. Bestätige den Dialog; bis dahin kannst du Diktate hier im App-Fenster starten.',
+        'Your desktop is asking for permission to use global shortcuts. Confirm the dialog; until then, start dictation inside the app window.',
       )}</p> : <p>{t(
         'Globale Diktate sind auf diesem System aktuell nicht verfügbar. Starte Aufnahmen in Voicewright und kopiere das Ergebnis manuell in die Zielanwendung.',
         'Global dictation is currently unavailable on this system. Start recording inside Voicewright and copy the result manually into the target app.',

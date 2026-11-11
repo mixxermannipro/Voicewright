@@ -9,6 +9,12 @@ Cloud-Dienste sind freiwillig und nur mit eigener Konfiguration aktiv.
 bekannten Einschränkungen und offenen Schritten steht in
 [docs/PROGRESS.md](docs/PROGRESS.md).
 
+Unter Linux nutzt Voicewright auf X11 globale Tasten und sicheres direktes
+Einfügen. Auf Wayland kommen globale Tasten über das XDG-Desktop-Portal,
+sofern der Desktop es anbietet und du die Freigabe bestätigst. Automatisches
+Einfügen bleibt dort bewusst aus; der erkannte Text bleibt in der App und
+lässt sich kopieren.
+
 - [Installation und Entwicklung](docs/INSTALLATION.md)
 - [Sprach- und Korrekturmodelle](docs/MODELS.md)
 - [Anbieter](docs/PROVIDERS.md)

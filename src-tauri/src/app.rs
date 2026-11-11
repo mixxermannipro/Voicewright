@@ -1,6 +1,6 @@
 use crate::{
     audio::{self, Capture},
-    cleanup, guard, insertion, models, providers,
+    cleanup, guard, hotkeys, insertion, models, providers,
     session::{apply_shortcut_changes, Action, HotkeyState, Phase, ShortcutKind, Status},
     settings::{self, CleanupMode, RecordingMode, Settings},
     settings_portable, speech, spoken_format,
@@ -54,6 +54,9 @@ struct Inner {
     capture: Option<Arc<Capture>>,
     shortcut_error: Option<String>,
     shortcut_active: bool,
+    shortcut_state: hotkeys::ShortcutStatus,
+    shortcut_detail: Option<String>,
+    portal: Option<hotkeys::Controller>,
     press: HotkeyState,
     session: u64,
     started_from_hotkey: bool,
@@ -86,7 +89,9 @@ struct StatusView {
     warning: Option<String>,
     inserted: bool,
     shortcut_error: Option<String>,
+    shortcut_detail: Option<String>,
     shortcut_active: bool,
+    shortcut_state: hotkeys::ShortcutStatus,
     download: Option<Download>,
     installed: Vec<String>,
 }
@@ -105,7 +110,11 @@ struct Initial {
     settings: Settings,
     catalog: &'static [models::Model],
     hardware: Hardware,
-    global_supported: bool,
+    shortcut_backend: hotkeys::Backend,
+    shortcut_state: hotkeys::ShortcutStatus,
+    insertion_supported: bool,
+    insertion_detail: Option<&'static str>,
+    session_type: insertion::SessionKind,
     tray_available: bool,
     model_path: PathBuf,
     default_prompt: &'static str,
@@ -113,11 +122,16 @@ struct Initial {
 
 #[tauri::command]
 fn initial(state: State<'_, AppState>) -> Initial {
+    let inner = state.inner.lock().unwrap();
     Initial {
-        settings: state.inner.lock().unwrap().settings.clone(),
+        settings: inner.settings.clone(),
         catalog: models::CATALOG,
         hardware: state.hardware.clone(),
-        global_supported: insertion::global_supported(),
+        shortcut_backend: hotkeys::backend(),
+        shortcut_state: inner.shortcut_state,
+        insertion_supported: insertion::automatic_supported(),
+        insertion_detail: insertion::unavailable_reason(),
+        session_type: insertion::session_kind(),
         tray_available: state.tray_available.load(Ordering::Relaxed),
         model_path: state.models(),
         default_prompt: settings::DEFAULT_PROMPT,
@@ -140,7 +154,9 @@ fn status(state: State<'_, AppState>) -> StatusView {
         warning: inner.status.warning.clone(),
         inserted: inner.status.inserted,
         shortcut_error: inner.shortcut_error.clone(),
+        shortcut_detail: inner.shortcut_detail.clone(),
         shortcut_active: inner.shortcut_active,
+        shortcut_state: inner.shortcut_state,
         download: inner.download.clone(),
         installed: models::installed(&state.models()),
     }
@@ -171,15 +187,15 @@ fn replace_shortcuts(
     previous: &[Shortcut],
     next: &[Shortcut],
 ) -> Result<(), String> {
-    if !insertion::global_supported() {
-        return Ok(());
+    match hotkeys::backend() {
+        hotkeys::Backend::X11 | hotkeys::Backend::Native => apply_shortcut_changes(
+            previous,
+            next,
+            &|shortcut| app.global_shortcut().register(shortcut).is_ok(),
+            &|shortcut| app.global_shortcut().unregister(shortcut).is_ok(),
+        ),
+        hotkeys::Backend::Portal | hotkeys::Backend::Unsupported => Ok(()),
     }
-    apply_shortcut_changes(
-        previous,
-        next,
-        &|shortcut| app.global_shortcut().register(shortcut).is_ok(),
-        &|shortcut| app.global_shortcut().unregister(shortcut).is_ok(),
-    )
 }
 
 #[tauri::command]
@@ -193,25 +209,70 @@ fn save_settings(
     if inner.status.phase.busy() {
         return Err("Finish the current dictation before saving settings.".into());
     }
-    let previous = if inner.shortcut_active {
+    let backend = hotkeys::backend();
+    let native = matches!(backend, hotkeys::Backend::X11 | hotkeys::Backend::Native);
+    let previous = if native && inner.shortcut_active {
         shortcuts(&inner.settings)
     } else {
         Vec::new()
     };
     let next = shortcuts(&value);
-    replace_shortcuts(&app, &previous, &next)?;
+    if native {
+        replace_shortcuts(&app, &previous, &next)?;
+    }
     if let Err(error) = settings::save(&state.settings(), &value) {
-        let rollback = replace_shortcuts(&app, &next, &previous);
-        if rollback.is_err() {
-            inner.shortcut_error = Some("Could not restore the previous shortcuts.".into());
-            inner.shortcut_active = false;
+        if native {
+            let rollback = replace_shortcuts(&app, &next, &previous);
+            if rollback.is_err() {
+                inner.shortcut_error = Some("Could not restore the previous shortcuts.".into());
+                inner.shortcut_active = false;
+                inner.shortcut_state = hotkeys::ShortcutStatus::Error;
+            }
         }
         return Err(error);
     }
     inner.settings = value;
-    inner.shortcut_error = None;
-    inner.shortcut_active = insertion::global_supported();
     inner.press.reset();
+    match backend {
+        hotkeys::Backend::X11 | hotkeys::Backend::Native => {
+            inner.shortcut_error = None;
+            inner.shortcut_detail = None;
+            inner.shortcut_active = true;
+            inner.shortcut_state = hotkeys::ShortcutStatus::Active;
+        }
+        hotkeys::Backend::Portal => {
+            if let Some(portal) = &inner.portal {
+                portal.rebind(hotkeys::bindings(&inner.settings));
+            }
+            inner.shortcut_error = None;
+            inner.shortcut_detail = None;
+            inner.shortcut_active = false;
+            inner.shortcut_state = hotkeys::ShortcutStatus::Pending;
+        }
+        hotkeys::Backend::Unsupported => {
+            inner.shortcut_error = None;
+            inner.shortcut_detail = None;
+            inner.shortcut_active = false;
+            inner.shortcut_state = hotkeys::ShortcutStatus::Unavailable;
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn retry_shortcuts(state: State<'_, AppState>) -> Result<(), String> {
+    if hotkeys::backend() != hotkeys::Backend::Portal {
+        return Ok(());
+    }
+    let mut inner = state.inner.lock().unwrap();
+    let Some(portal) = &inner.portal else {
+        return Err("The desktop shortcut portal is not running.".into());
+    };
+    portal.rebind(hotkeys::bindings(&inner.settings));
+    inner.shortcut_state = hotkeys::ShortcutStatus::Pending;
+    inner.shortcut_active = false;
+    inner.shortcut_detail = None;
+    inner.shortcut_error = None;
     Ok(())
 }
 
@@ -336,7 +397,7 @@ fn start_session(app: &AppHandle, from_hotkey: bool) -> Result<(), String> {
     let settings = inner.settings.clone();
     let root = state.models();
     let speech_model = models::ready(&root, &settings.speech_model)?;
-    let target = if from_hotkey && settings.auto_insert {
+    let target = if from_hotkey && settings.auto_insert && insertion::automatic_supported() {
         insertion::target()
     } else {
         None
@@ -543,10 +604,14 @@ async fn pipeline(
             Err(error) => append_warning(&mut warning, error),
         }
     } else if from_hotkey {
-        append_warning(
-            &mut warning,
-            "The result is available to copy in Voicewright.".into(),
-        );
+        let message = if !settings.auto_insert {
+            "The result is available to copy in Voicewright."
+        } else {
+            insertion::unavailable_reason().unwrap_or(
+                "The target window could not be verified. The result is available to copy in Voicewright.",
+            )
+        };
+        append_warning(&mut warning, message.into());
     }
     let mut inner = state.inner.lock().unwrap();
     if inner.session == session {
@@ -576,27 +641,60 @@ fn fail_shortcut(app: &AppHandle, error: String) {
     set_tray_status(app, Phase::Failed, true);
 }
 
-fn handle_shortcut(app: &AppHandle, shortcut: &Shortcut, state: ShortcutState) {
-    let app_state = app.state::<AppState>();
-    let mut inner = app_state.inner.lock().unwrap();
-    let pressed = state == ShortcutState::Pressed;
-    let kind = if inner
-        .settings
+fn shortcut_kind(settings: &Settings, shortcut: &Shortcut) -> Option<ShortcutKind> {
+    if settings
         .cancel_shortcut
         .parse::<Shortcut>()
         .is_ok_and(|cancel| cancel.id() == shortcut.id())
     {
-        ShortcutKind::Cancel
-    } else if inner
-        .settings
+        Some(ShortcutKind::Cancel)
+    } else if settings
         .shortcut
         .parse::<Shortcut>()
         .is_ok_and(|current| current.id() == shortcut.id())
     {
-        ShortcutKind::Dictation
+        Some(ShortcutKind::Dictation)
     } else {
-        return;
+        None
+    }
+}
+
+fn handle_shortcut(app: &AppHandle, shortcut: &Shortcut, state: ShortcutState) {
+    let app_state = app.state::<AppState>();
+    let kind = {
+        let inner = app_state.inner.lock().unwrap();
+        shortcut_kind(&inner.settings, shortcut)
     };
+    if let Some(kind) = kind {
+        handle_shortcut_kind(app, kind, state == ShortcutState::Pressed);
+    }
+}
+
+fn portal_shortcut_kind(id: &str) -> Option<ShortcutKind> {
+    match id {
+        "dictation" => Some(ShortcutKind::Dictation),
+        "cancel" => Some(ShortcutKind::Cancel),
+        _ => None,
+    }
+}
+
+fn set_shortcut_status(app: &AppHandle, state: hotkeys::ShortcutStatus, detail: Option<String>) {
+    let app_state = app.state::<AppState>();
+    let mut inner = app_state.inner.lock().unwrap();
+    inner.shortcut_state = state;
+    inner.shortcut_active = state == hotkeys::ShortcutStatus::Active;
+    inner.shortcut_detail = detail.clone();
+    inner.shortcut_error = match state {
+        hotkeys::ShortcutStatus::Pending
+        | hotkeys::ShortcutStatus::Active
+        | hotkeys::ShortcutStatus::Unknown => None,
+        _ => detail,
+    };
+}
+
+fn handle_shortcut_kind(app: &AppHandle, kind: ShortcutKind, pressed: bool) {
+    let app_state = app.state::<AppState>();
+    let mut inner = app_state.inner.lock().unwrap();
     let hold = inner.settings.recording_mode == RecordingMode::Hold;
     let phase = inner.status.phase;
     match inner.press.change(kind, pressed, hold, phase) {
@@ -868,10 +966,11 @@ fn tray(app: &AppHandle) -> tauri::Result<()> {
 
 pub fn run() {
     whisper_rs::install_logging_hooks();
+    let backend = hotkeys::backend();
     let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _, _| show(app)))
         .plugin(tauri_plugin_dialog::init());
-    if insertion::global_supported() {
+    if matches!(backend, hotkeys::Backend::X11 | hotkeys::Backend::Native) {
         builder = builder.plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, shortcut, event| {
@@ -885,7 +984,7 @@ pub fn run() {
         );
     }
     builder
-        .setup(|app| {
+        .setup(move |app| {
             let root = app.path().app_data_dir()?;
             migrate_legacy_data(&root);
             let mut status = Status::default();
@@ -894,6 +993,18 @@ pub fn run() {
                 Settings::default()
             });
             let next = shortcuts(&settings);
+            let portal_bindings = if backend == hotkeys::Backend::Portal {
+                Some(hotkeys::bindings(&settings))
+            } else {
+                None
+            };
+            let initial_shortcut_state = match backend {
+                hotkeys::Backend::Portal => hotkeys::ShortcutStatus::Pending,
+                hotkeys::Backend::Unsupported => hotkeys::ShortcutStatus::Unavailable,
+                hotkeys::Backend::X11 | hotkeys::Backend::Native => {
+                    hotkeys::ShortcutStatus::Unknown
+                }
+            };
             let system = sysinfo::System::new_all();
             app.manage(AppState {
                 root,
@@ -915,6 +1026,9 @@ pub fn run() {
                     session: 0,
                     shortcut_error: None,
                     shortcut_active: false,
+                    shortcut_state: initial_shortcut_state,
+                    shortcut_detail: None,
+                    portal: None,
                     started_from_hotkey: false,
                     transfer: None,
                     download: None,
@@ -924,10 +1038,51 @@ pub fn run() {
             state
                 .tray_available
                 .store(tray(app.handle()).is_ok(), Ordering::Relaxed);
-            let shortcut_result = replace_shortcuts(app.handle(), &[], &next);
-            let mut inner = state.inner.lock().unwrap();
-            inner.shortcut_active = shortcut_result.is_ok() && insertion::global_supported();
-            inner.shortcut_error = shortcut_result.err();
+            match backend {
+                hotkeys::Backend::X11 | hotkeys::Backend::Native => {
+                    let shortcut_result = replace_shortcuts(app.handle(), &[], &next);
+                    let mut inner = state.inner.lock().unwrap();
+                    inner.shortcut_active = shortcut_result.is_ok();
+                    inner.shortcut_state = if shortcut_result.is_ok() {
+                        hotkeys::ShortcutStatus::Active
+                    } else {
+                        hotkeys::ShortcutStatus::Error
+                    };
+                    inner.shortcut_error = shortcut_result.err();
+                }
+                hotkeys::Backend::Portal => {
+                    let (controller, mut events) =
+                        hotkeys::start(portal_bindings.unwrap_or_default());
+                    state.inner.lock().unwrap().portal = Some(controller);
+                    let handle = app.handle().clone();
+                    tauri::async_runtime::spawn(async move {
+                        while let Some(event) = events.recv().await {
+                            match event {
+                                hotkeys::Event::Status(status, detail) => {
+                                    set_shortcut_status(&handle, status, detail);
+                                }
+                                hotkeys::Event::Pressed(id) => {
+                                    if let Some(kind) = portal_shortcut_kind(id) {
+                                        let target = handle.clone();
+                                        let _ = handle.run_on_main_thread(move || {
+                                            handle_shortcut_kind(&target, kind, true);
+                                        });
+                                    }
+                                }
+                                hotkeys::Event::Released(id) => {
+                                    if let Some(kind) = portal_shortcut_kind(id) {
+                                        let target = handle.clone();
+                                        let _ = handle.run_on_main_thread(move || {
+                                            handle_shortcut_kind(&target, kind, false);
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+                hotkeys::Backend::Unsupported => {}
+            }
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -947,6 +1102,7 @@ pub fn run() {
             default_settings,
             export_settings,
             import_settings_preview,
+            retry_shortcuts,
             preview_cleanup,
             start_test,
             stop,
