@@ -81,6 +81,16 @@ Pflichtchecks bestanden, einschließlich Release-DEB/AppImage auf Ubuntu
 22.04 mit GLIBC ≤ 2.35 (2 bzw. 180 ELF-Dateien). Prüfsummen und Link stehen
 im Linux-Protokoll. Nach Integration von #73 werden die Checks erneut ausgeführt.
 
+**Nach Integration von #73 lokal erneut geprüft:** 12 npm- und 7 Python-Tests,
+96 App-/Parser-Tests (10 vollständige Durchläufe) und 9 Engine-/Protokolltests;
+fmt/Clippy für beide Cargo-Projekte bestanden. Zwei App-Modelltests und ein
+Engine-Modelltest blieben ohne Gewichte übersprungen. Dabei wurde zunächst
+ein sporadischer Linux-Startfehler `ETXTBSY` reproduziert. Ausschließlich
+dieser Fehler erhält jetzt bis zu fünf Wiederholungen mit jeweils 10 ms;
+Abbruch und dauerhafte Fehler bleiben kontrolliert. Ein echter Schreibhandle
+reproduziert im neuen Test sowohl vorübergehend als auch dauerhaft belegte
+Programmdateien. Der Test war vor der Korrektur rot, danach grün.
+
 **Offen:** reale Installation/Updates auf fremden Distributionen, physisches
 Mikrofon, GNOME/KDE-/Wayland-Abnahme und vollständige Lizenzprüfung aller
 gebündelten Systembibliotheken. Kein bit-identisches Buildversprechen.
