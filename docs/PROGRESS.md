@@ -66,10 +66,10 @@ Actions-Artefakt. Der Releaseablauf übernimmt dieselben geprüften Linux-Pakete
 GGML baut ohne native/AVX-Anforderungen; der Sidecar-Paketcache ist von alten
 AVX-Builds getrennt. Der X11-Smoke unterstützt nun auch AppImage.
 
-**Lokal nachgewiesen:** npm-Typprüfung, Lint, Tests, Webbuild und Audit (0
+**Lokal nachgewiesen:** npm-Typprüfung, Lint, 12 Tests, Webbuild und Audit (0
 Schwachstellen); beide Rust-fmt-/Clippy-Prüfungen, 78 App-/Parser-Tests und
 6 Engine-/Protokolltests; je ein echter Modelltest blieb ohne Gewichte
-übersprungen. Python-Paketprüfertests, AppStream und actionlint bestanden. Release-DEB
+übersprungen. 7 Python-Paketprüfertests, AppStream und actionlint bestanden. Release-DEB
 und AppImage wurden auf Fedora 45 gebaut. Das Fedora-AppImage benötigt GLIBC
 2.44; der Prüfer hat die portable Grenze korrekt abgewiesen. Mit expliziter
 lokaler Grenze 2.44 bestanden Layout, Laufzeiten und 202 ELF-Prüfungen.

@@ -6,9 +6,11 @@ const config = JSON.parse(readFileSync('src-tauri/tauri.conf.json', 'utf8'));
 describe('Linux package contract', () => {
   it('declares native libraries for the application and cleanup sidecar', () => {
     const dependencies = config.bundle.linux.deb.depends.join(' ');
-    for (const dependency of ['libwebkit2gtk-4.1-0', 'libgtk-3-0', 'libayatana-appindicator3-1', 'libasound2', 'libxdo3', 'libxkbcommon0']) {
+    for (const dependency of ['libwebkit2gtk-4.1-0', 'libgtk-3-0', 'libayatana-appindicator3-1', 'libasound2']) {
       expect(dependencies).toContain(dependency);
     }
+    expect(dependencies).not.toContain('libxdo3');
+    expect(dependencies).not.toContain('libxkbcommon0');
   });
 
   it('ships AppStream and legal notices in both Linux formats', () => {
@@ -40,5 +42,10 @@ describe('Linux package contract', () => {
   it('does not reuse the old AVX-enabled packaging cache', () => {
     expect(readFileSync('scripts/prepare-engine.mjs', 'utf8'))
       .toContain("resolve('engines/cleanup/target/portable')");
+  });
+
+  it('does not invent a published release version or date in AppStream', () => {
+    expect(readFileSync('src-tauri/linux/de.voicewright.desktop.metainfo.xml', 'utf8'))
+      .not.toContain('<release ');
   });
 });

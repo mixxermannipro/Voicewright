@@ -11,7 +11,17 @@ from pathlib import Path
 
 
 def run(*args, **kwargs):
-    return subprocess.check_output(args, text=True, stderr=subprocess.STDOUT, **kwargs)
+    try:
+        return subprocess.check_output(args, text=True, stderr=subprocess.STDOUT, **kwargs)
+    except subprocess.CalledProcessError as error:
+        raise ValueError(f"{' '.join(args)} failed ({error.returncode}):\n{error.output}") from error
+
+
+def declared_glibc(dependencies):
+    match = re.search(r'\blibc6\s*\(>=\s*(\d+)\.(\d+)', dependencies)
+    if not match:
+        raise ValueError('Missing versioned libc6 minimum in DEB dependencies')
+    return tuple(map(int, match.groups()))
 
 
 def glibc_versions(text):
@@ -63,9 +73,11 @@ def validate(artifact, maximum):
         elif artifact.suffix == '.deb':
             run('dpkg-deb', '-x', str(artifact), str(root))
             dependencies = run('dpkg-deb', '-f', str(artifact), 'Depends')
-            for name in ['libc6', 'libwebkit2gtk-4.1-0', 'libgtk-3-0', 'libasound2', 'libxdo3', 'libxkbcommon0']:
+            for name in ['libc6', 'libwebkit2gtk-4.1-0', 'libgtk-3-0', 'libasound2']:
                 if name not in dependencies:
                     raise ValueError(f'Missing DEB dependency: {name}')
+            # Never let --max-glibc conceal an understated DEB libc6 requirement.
+            maximum = min(maximum, declared_glibc(dependencies))
             print(f'Depends: {dependencies.strip()}')
         else:
             raise ValueError('Expected .deb or .AppImage')
@@ -111,4 +123,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except (ValueError, OSError) as error:
+        raise SystemExit(str(error)) from error

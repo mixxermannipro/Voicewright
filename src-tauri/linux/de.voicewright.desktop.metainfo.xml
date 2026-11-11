@@ -17,7 +17,4 @@
   <url type="homepage">https://github.com/mixxermannipro/Voicewright</url>
   <url type="bugtracker">https://github.com/mixxermannipro/Voicewright/issues</url>
   <content_rating type="oars-1.1" />
-  <releases>
-    <release version="0.1.0-alpha.1" date="2026-11-11" type="development" />
-  </releases>
 </component>

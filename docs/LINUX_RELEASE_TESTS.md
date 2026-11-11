@@ -13,6 +13,10 @@ unbekannte Drittanbieter-Dateien verwenden.
 AppImage and DEB are built on Ubuntu 22.04 in CI. The validator checks layout,
 permissions, desktop metadata, notices, dynamic dependencies and GLIBC ≤ 2.35.
 Only use it on trusted builds: AppImage extraction executes its runtime stub.
+Die ELF-Anforderung darf außerdem das im DEB deklarierte `libc6`-Minimum
+nicht überschreiten. Die `ldd`-Prüfung läuft auf dem Baurechner; sie ist keine
+Prüfung in einem frischen Laufzeitsystem ohne Entwicklungsbibliotheken.
+The ldd check uses the build host; a clean runtime system still needs testing.
 
 ```sh
 python3 -m unittest discover -s scripts -p 'test_linux_bundle.py'
@@ -43,8 +47,8 @@ survived 12 seconds. Audio, dictation and upgrades were not exercised.
 SHA-256 der lokalen Fedora-Pakete (nicht veröffentlicht; nach Neu-Bau anders):
 
 ```text
-542705c86e3771c4bc7435a3debe0d1712c563cb0dcf3c280231e8e4e7a27b41  Voicewright_0.1.0-alpha.1_amd64.deb
-a143e3716d556d6178e44494a274bfa33e08845abf35148df371c7eba34cba29  Voicewright_0.1.0-alpha.1_amd64.AppImage
+0753bcba7eabaf181b1b3c962ceadaa0e8efe59710e37da4e7d588a802eef853  Voicewright_0.1.0-alpha.1_amd64.deb
+2a5e0f7a3331595b8fd72f02285cb0fa8950512f5864f53ac03b46c9c7e8175c  Voicewright_0.1.0-alpha.1_amd64.AppImage
 ```
 
 Eine bestandene Paketprüfung ersetzt diese Tests nicht. Pro Paket und Umgebung

@@ -62,6 +62,17 @@ class BundleTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "AppRun"):
                 bundle.check_layout(Path(directory), True)
 
+    def test_subprocess_errors_include_original_diagnostics(self):
+        with self.assertRaisesRegex(ValueError, 'runtime-fixture'):
+            bundle.run('sh', '-c', 'echo runtime-fixture; exit 1')
+
+    def test_declared_deb_glibc_cannot_understate_actual_requirement(self):
+        self.assertEqual(bundle.declared_glibc('libc6 (>= 2.35), libgcc-s1'), (2, 35))
+        with self.assertRaisesRegex(ValueError, '2.36'):
+            bundle.check_glibc('GLIBC_2.36', bundle.declared_glibc('libc6 (>= 2.35)'))
+        with self.assertRaisesRegex(ValueError, 'libc6'):
+            bundle.declared_glibc('libgcc-s1')
+
 
 if __name__ == "__main__":
     unittest.main()
