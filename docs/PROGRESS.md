@@ -36,6 +36,13 @@ die minimale Settings-Oberfläche und vollständig geprüfte Kandidatenpakete
 sind noch nicht als V1 nachgewiesen. Dieses Teil-Gate ist keine fertige V1,
 kein Release und kein Anlass für eine vorgezogene Nutzerabnahme.
 
+**Erster PR-CI-Lauf:** PR #78 / Lauf `43226625981`: Webchecks,
+Workflow-Lint und Linux-Paketjob bestanden. Der neue Python-Prüfschritt
+fand eine fehlende Runner-Voraussetzung: `desktop-file-validate` war nur
+im Paketjob installiert. `desktop-file-utils` wurde deshalb auch dem
+Rust-Job hinzugefügt; Tests wurden nicht übersprungen oder abgeschwächt.
+Der erste CI-Lauf ist rot, der Modellschritt wurde dort noch nicht erreicht.
+
 > **Historische Entwicklungsnachweise.** Seit **12.11.2026** ist nur noch [V1-Issue #76](https://github.com/mixxermannipro/Voicewright/issues/76) mit [V1_SCOPE.md](V1_SCOPE.md) und [VIRTUAL_TESTING.md](VIRTUAL_TESTING.md) der aktuelle Arbeitsauftrag. Die alten Issues #39/#47 und ihre manuellen Zwischenfreigaben wurden ersetzt. Alle während der Entwicklung erforderlichen Tests sollen **autonom virtuell** stattfinden; der Eigentümer testet den fertigen Kandidaten einmal ganz am Ende und gibt dann Feedback. Historische Tests und ältere Branch-Anweisungen unten sind nicht automatisch aktuelle Freigabenachweise.
 
 
