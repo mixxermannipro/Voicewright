@@ -1,5 +1,45 @@
 # Arbeitsstand und Übergabe
 
+## Issue #76 – feldgebundene X11-Ausgabe (12. November 2026)
+
+Eigener Zweig von `fcf9dae`, unabhängig von Modell-PR #78. Die alte
+Fensteridentität erkannte weder Passwortfelder noch Feldwechsel im selben
+Fenster. Ein neuer virtueller Test reproduzierte zusätzlich Return-Ereignisse
+bei Absätzen – damit konnte auch ein mehrzeiliges Chatfeld eine Nachricht
+absenden. Linux-X11 verwendet jetzt die vorhandene ashpd/zbus-Anbindung
+für eine begrenzte AT-SPI-Metadatenprüfung und einen einzigen literalen
+Textaufruf an das erfasste Feld statt Tastatur-/Return-Ereignissen.
+
+Unbekannte, geschützte, inaktive, nicht bearbeitbare und mehrdeutige Felder
+blockieren. Prozess, eindeutiger Bus/Objektpfad, aktives Fenster, Fokus und
+Cursor-/Selektionsänderungen werden geprüft. Vorhandene Selektion wird nicht
+ersetzt; Zieltexte werden nicht gelesen. Nach möglicher Ausgabe ohne
+Bestätigung bleibt eine klare Warnung, kein Retry. Windows akzeptiert nur
+native `Edit`-Klassen ohne Passwort/Readonly/Disabled-Stil; Windows-Absätze
+bleiben Copy-only. **Windows ist damit noch nicht nativ geprüft.**
+
+**Tatsächlich lokal/virtuell geprüft:** Node-Typen, ESLint, 12 Vitest-Tests,
+Web-Build; beide Cargo-Projekte fmt/Clippy und `--all-targets`-Tests
+(109 App-/Parser-/Example-Tests, 9 Cleanup-Tests bestanden, 3 echte Modelltests
+in den Standardläufen weiterhin ignoriert); 7 Python-Pakettests, actionlint.
+Ein isolierter Podman-Container auf Basis `localhost/voxtakt-build:latest`
+erhielt nur die fehlenden virtuellen Testdienste `at-spi2-core`/`dbus-x11`.
+Die anschließenden Läufe hatten **kein Netz**, einen eigenen D-Bus und Xvfb.
+Echte GTK-Tests bestanden wiederholt: Unicode/Emoji/Absatz exakt ohne Return,
+Passwort blockiert, Einzeilentext erfolgreich/Absatz blockiert, Selektion
+unverändert, gleicher Fenster-/anderer Feldfokus blockiert, Bus fehlt blockiert.
+Vorherige Fehlläufe (Busdienst fehlt, Return-Reproduktion) wurden ausgewertet,
+nicht übersprungen. Keine Nutzerdesktop- oder Permission-Prüfung.
+
+DeepSeek V4.1 Flash Free lieferte Bestandsanalyse, Sicherheitsreview und
+eine gezielte Transportnachprüfung. Deren Fokus-/Mehrdeutigkeits-/Win32-
+Fehlerbehandlung wurde eingearbeitet. Die UTF-8-Byte-Länge bei `InsertText`
+und Zeichenpositionen folgen dem offiziellen AT-SPI-Vertrag; andere Toolkits
+sind weiterhin nicht praktisch belegt. Auch dieser Weg ist kein atomarer
+Ausschluss aller denkbaren Rennen und keine universelle Fremd-App-Garantie.
+Qt/Browser, native OS-Prüfungen, Wayland, vollständiges Mikrofon-App-E2E,
+Minimal-UI und Kandidatenpakete bleiben als V1-Grenzen offen.
+
 > **Historische Entwicklungsnachweise.** Seit **12.11.2026** ist nur noch [V1-Issue #76](https://github.com/mixxermannipro/Voicewright/issues/76) mit [V1_SCOPE.md](V1_SCOPE.md) und [VIRTUAL_TESTING.md](VIRTUAL_TESTING.md) der aktuelle Arbeitsauftrag. Die alten Issues #39/#47 und ihre manuellen Zwischenfreigaben wurden ersetzt. Alle während der Entwicklung erforderlichen Tests sollen **autonom virtuell** stattfinden; der Eigentümer testet den fertigen Kandidaten einmal ganz am Ende und gibt dann Feedback. Historische Tests und ältere Branch-Anweisungen unten sind nicht automatisch aktuelle Freigabenachweise.
 
 

@@ -23,7 +23,22 @@ fn main() {
     let text = std::env::args()
         .nth(1)
         .unwrap_or_else(|| "Grüße aus Köln.\nZweiter Absatz 😀 🇩🇪👨‍👩‍👧‍👦 – ß, é, €.".to_owned());
-    let target = insertion::target().expect("no focused X11 target window");
+    let Some(target) = insertion::target() else {
+        eprintln!("no verified editable X11 text field");
+        std::process::exit(1);
+    };
+    // Test-only barrier lets the isolated harness switch widgets *after* capture.
+    if let Some(marker) = std::env::var_os("VOICEWRIGHT_PROBE_CAPTURED") {
+        std::fs::write(marker, b"captured").expect("write capture marker");
+        let release = std::env::var_os("VOICEWRIGHT_PROBE_RELEASE").expect("release marker");
+        let started = std::time::Instant::now();
+        while !std::path::Path::new(&release).exists() {
+            if started.elapsed() > std::time::Duration::from_secs(5) {
+                std::process::exit(3);
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+    }
     if let Err(error) = insertion::insert(target, &text, &AtomicBool::new(false)) {
         eprintln!("insertion failed: {error}");
         std::process::exit(1);

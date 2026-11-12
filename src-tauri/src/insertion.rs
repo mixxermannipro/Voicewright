@@ -1,10 +1,16 @@
-use enigo::{Direction, Enigo, Key, Keyboard, Settings};
+#[cfg(not(target_os = "linux"))]
+use enigo::{Enigo, Keyboard, Settings};
 use std::{
     borrow::Cow,
     sync::atomic::{AtomicBool, Ordering},
     time::Duration,
 };
+#[cfg(any(not(target_os = "linux"), test))]
 use unicode_segmentation::UnicodeSegmentation;
+
+#[cfg(target_os = "linux")]
+#[path = "insertion/atspi.rs"]
+mod atspi;
 
 /// The display server session that owns the focused window.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
@@ -88,22 +94,28 @@ pub fn unavailable_reason() -> Option<&'static str> {
 
 /// Identity used to reject an insertion after a focus change.
 ///
-/// A window or field can be replaced without the numeric id changing, so this
-/// is a safety signal rather than proof of the same text field. The X11 path
-/// additionally samples the target twice before typing and before every chunk.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Window ids alone do not prove a text field. X11 additionally binds a live
+/// editable AT-SPI object in the same process/active window, then addresses
+/// literal text to that object. Unknown metadata always takes the copy path.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Target {
     focus: u32,
     active: u32,
     pid: u32,
+    multiline: bool,
+    #[cfg(target_os = "linux")]
+    field: Option<atspi::Field>,
 }
 
 const TARGET_CHANGED: &str = "The target changed or a modifier is held. Copy the result manually.";
 const CANCELLED: &str = "Insertion was cancelled. The result is available to copy.";
 const PARTIAL: &str =
-    "Insertion stopped after partial input. The full result is available to copy.";
+    "Insertion could not be confirmed; text may already be present. Check before copying. / Einfügen nicht bestätigt; Text kann bereits vorhanden sein. Vor dem Kopieren prüfen.";
 const TOO_COMPLEX: &str =
     "The result is too long or contains unsupported control characters. Copy it manually.";
+const PARAGRAPHS: &str =
+    "Paragraphs require the safe copy path on this target. / Absätze hier bitte sicher kopieren.";
+#[cfg(not(target_os = "linux"))]
 const FAILED: &str = "Text insertion could not be confirmed. The result is available to copy.";
 const STABLE_WINDOW: Duration = Duration::from_millis(60);
 
@@ -166,32 +178,52 @@ fn x11_focus(check_modifiers: bool) -> Option<Target> {
         .reply()
         .ok()?
         .atom;
-    let pid = [active, focus]
-        .into_iter()
-        .find_map(|window| {
-            if window <= 1 || pid_atom == 0 {
-                return None;
-            }
-            connection
-                .get_property(false, window, pid_atom, AtomEnum::CARDINAL, 0, 1)
-                .ok()?
-                .reply()
-                .ok()?
-                .value32()
-                .and_then(|mut value| value.next())
-        })
-        .unwrap_or(0);
-    Some(Target { focus, active, pid })
+    // Resolve the focused client's ancestry, never an unrelated active window.
+    let mut window = focus;
+    let mut pid = 0;
+    for _ in 0..64 {
+        if window <= 1 || window == root || pid_atom == 0 {
+            break;
+        }
+        if let Some(value) = connection
+            .get_property(false, window, pid_atom, AtomEnum::CARDINAL, 0, 1)
+            .ok()?
+            .reply()
+            .ok()?
+            .value32()
+            .and_then(|mut value| value.next())
+        {
+            pid = value;
+            break;
+        }
+        window = connection.query_tree(window).ok()?.reply().ok()?.parent;
+    }
+    Some(Target {
+        focus,
+        active,
+        pid,
+        multiline: false,
+        field: None,
+    })
+}
+
+#[cfg(any(target_os = "windows", test))]
+fn safe_native_edit(class: &str, style: u32) -> bool {
+    // Native Edit has documented password/read-only/multiline semantics. Custom
+    // controls and browser render surfaces do not prove a safe field identity.
+    class == "Edit" && style & (0x20 | 0x800 | 0x0800_0000) == 0
 }
 
 #[cfg(target_os = "windows")]
 fn windows_focus(check_modifiers: bool) -> Option<Target> {
+    use windows_sys::Win32::Foundation::{GetLastError, SetLastError};
     use windows_sys::Win32::UI::{
         Input::KeyboardAndMouse::{
             GetAsyncKeyState, VK_CONTROL, VK_LWIN, VK_MENU, VK_RWIN, VK_SHIFT,
         },
         WindowsAndMessaging::{
-            GetForegroundWindow, GetGUIThreadInfo, GetWindowThreadProcessId, GUITHREADINFO,
+            GetClassNameW, GetForegroundWindow, GetGUIThreadInfo, GetWindowLongPtrW,
+            GetWindowThreadProcessId, GUITHREADINFO, GWL_STYLE,
         },
     };
     unsafe {
@@ -213,10 +245,25 @@ fn windows_focus(check_modifiers: bool) -> Option<Target> {
         if thread == 0 || GetGUIThreadInfo(thread, &mut info) == 0 || info.hwndFocus.is_null() {
             return None;
         }
+        let mut class = [0u16; 128];
+        let length = GetClassNameW(info.hwndFocus, class.as_mut_ptr(), class.len() as i32);
+        if length <= 0 {
+            return None;
+        }
+        SetLastError(0);
+        let raw_style = GetWindowLongPtrW(info.hwndFocus, GWL_STYLE);
+        if raw_style == 0 && GetLastError() != 0 {
+            return None;
+        }
+        let style = raw_style as u32;
+        if !safe_native_edit(&String::from_utf16_lossy(&class[..length as usize]), style) {
+            return None;
+        }
         Some(Target {
             focus: info.hwndFocus as u32,
             active: foreground as u32,
             pid,
+            multiline: style & 0x4 != 0,
         })
     }
 }
@@ -240,15 +287,32 @@ fn focus(_check_modifiers: bool) -> Option<Target> {
 }
 
 pub fn target() -> Option<Target> {
-    focus(false)
+    let target = focus(false)?;
+    #[cfg(target_os = "linux")]
+    let target = {
+        let mut target = target;
+        let field = atspi::capture(target.pid)?;
+        target.multiline = field.multiline;
+        target.field = Some(field);
+        target
+    };
+    Some(target)
 }
 
-fn ensure_target(target: Target, check_modifiers: bool) -> Result<(), &'static str> {
-    if focus(check_modifiers) == Some(target) {
-        Ok(())
-    } else {
-        Err(TARGET_CHANGED)
+fn ensure_target(target: &Target, check_modifiers: bool) -> Result<(), &'static str> {
+    let current = focus(check_modifiers).ok_or(TARGET_CHANGED)?;
+    if (current.focus, current.active, current.pid) != (target.focus, target.active, target.pid) {
+        return Err(TARGET_CHANGED);
     }
+    #[cfg(target_os = "linux")]
+    if !target.field.as_ref().is_some_and(atspi::unchanged) {
+        return Err(TARGET_CHANGED);
+    }
+    #[cfg(target_os = "windows")]
+    if current.multiline != target.multiline {
+        return Err(TARGET_CHANGED);
+    }
+    Ok(())
 }
 
 /// Reject text that can trigger navigation or terminal actions. Newlines are
@@ -273,17 +337,20 @@ fn normalize(text: &str) -> Result<Cow<'_, str>, &'static str> {
     Ok(text)
 }
 
+#[cfg(any(not(target_os = "linux"), test))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Piece {
     Text(String),
     Newline,
 }
 
+#[cfg(any(not(target_os = "linux"), test))]
 const CHUNK_GRAPHEMES: usize = 64;
 
 /// Split on grapheme clusters, not scalar values. Splitting a flag, a family
 /// emoji or a combining sequence between two keyboard events can produce
 /// broken output in some applications.
+#[cfg(any(not(target_os = "linux"), test))]
 fn pieces(text: &str) -> Vec<Piece> {
     let mut result = Vec::new();
     let mut current = String::new();
@@ -310,6 +377,7 @@ fn pieces(text: &str) -> Vec<Piece> {
     result
 }
 
+#[cfg(not(target_os = "linux"))]
 fn partial_error(typed: bool) -> &'static str {
     if typed {
         PARTIAL
@@ -323,32 +391,74 @@ pub fn insert(target: Target, text: &str, cancelled: &AtomicBool) -> Result<(), 
     if cancelled.load(Ordering::Relaxed) {
         return Err(CANCELLED);
     }
-    let mut input = Enigo::new(&Settings::default()).map_err(|_| FAILED)?;
-    // Two samples catch a focus change that happens while the result is being
-    // prepared. The target is sampled again before every chunk below.
-    ensure_target(target, true)?;
-    std::thread::sleep(STABLE_WINDOW);
-    ensure_target(target, true)?;
-    let mut typed = false;
-    for piece in pieces(&text) {
-        if cancelled.load(Ordering::Relaxed) {
-            return Err(if typed { PARTIAL } else { CANCELLED });
-        }
-        ensure_target(target, true).map_err(|_| partial_error(typed))?;
-        match piece {
-            Piece::Text(chunk) => input.text(&chunk).map_err(|_| partial_error(typed))?,
-            Piece::Newline => input
-                .key(Key::Return, Direction::Click)
-                .map_err(|_| partial_error(typed))?,
-        }
-        typed = true;
+    if text.contains('\n') && (!target.multiline || cfg!(not(target_os = "linux"))) {
+        return Err(PARAGRAPHS);
     }
-    Ok(())
+    // Two samples catch observable focus changes during preparation. Linux then
+    // writes literal text to the verified object; native key chunks recheck below.
+    ensure_target(&target, true)?;
+    std::thread::sleep(STABLE_WINDOW);
+    ensure_target(&target, true)?;
+    #[cfg(target_os = "linux")]
+    {
+        let field = target.field.as_ref().ok_or(TARGET_CHANGED)?;
+        atspi::insert_literal(field, &text, cancelled).map_err(|dispatched| {
+            if dispatched {
+                PARTIAL
+            } else {
+                TARGET_CHANGED
+            }
+        })
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let mut input = Enigo::new(&Settings::default()).map_err(|_| FAILED)?;
+        let mut typed = false;
+        for piece in pieces(&text) {
+            if cancelled.load(Ordering::Relaxed) {
+                return Err(if typed { PARTIAL } else { CANCELLED });
+            }
+            ensure_target(&target, true).map_err(|_| partial_error(typed))?;
+            match piece {
+                Piece::Text(chunk) => input.text(&chunk).map_err(|_| partial_error(typed))?,
+                Piece::Newline => return Err(TOO_COMPLEX), // Never synthesize Return.
+            }
+            typed = true;
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unknown_password_and_readonly_native_fields_are_copy_only() {
+        assert!(safe_native_edit("Edit", 0));
+        assert!(!safe_native_edit("Edit", 0x20));
+        assert!(!safe_native_edit("Edit", 0x800));
+        assert!(!safe_native_edit("Edit", 0x0800_0000));
+        for class in ["Chrome_WidgetWin_1", "ConsoleWindowClass", "", "CustomEdit"] {
+            assert!(!safe_native_edit(class, 0));
+        }
+    }
+
+    #[test]
+    fn paragraphs_never_open_input_for_a_single_line_target() {
+        let target = Target {
+            focus: 1,
+            active: 2,
+            pid: 3,
+            multiline: false,
+            #[cfg(target_os = "linux")]
+            field: None,
+        };
+        assert_eq!(
+            insert(target, "one\ntwo", &AtomicBool::new(false)),
+            Err("Paragraphs require the safe copy path on this target. / Absätze hier bitte sicher kopieren.")
+        );
+    }
 
     #[cfg(target_os = "linux")]
     #[test]
@@ -413,6 +523,9 @@ mod tests {
             focus: 1,
             active: 2,
             pid: 3,
+            multiline: false,
+            #[cfg(target_os = "linux")]
+            field: None,
         };
         let cancelled = AtomicBool::new(true);
         assert_eq!(insert(target, "Hallo", &cancelled), Err(CANCELLED));
@@ -424,6 +537,9 @@ mod tests {
             focus: 1,
             active: 2,
             pid: 3,
+            multiline: false,
+            #[cfg(target_os = "linux")]
+            field: None,
         };
         let cancelled = AtomicBool::new(false);
         assert_eq!(insert(target, "run\tcommand", &cancelled), Err(TOO_COMPLEX));

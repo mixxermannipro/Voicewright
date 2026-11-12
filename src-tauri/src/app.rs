@@ -608,7 +608,7 @@ async fn pipeline(
             "The result is available to copy in Voicewright."
         } else {
             insertion::unavailable_reason().unwrap_or(
-                "The target window could not be verified. The result is available to copy in Voicewright.",
+                "The editable text field could not be verified; copy the result in Voicewright. / Das bearbeitbare Textfeld konnte nicht geprüft werden; Ergebnis in Voicewright kopieren.",
             )
         };
         append_warning(&mut warning, message.into());

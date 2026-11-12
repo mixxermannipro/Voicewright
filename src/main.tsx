@@ -403,14 +403,14 @@ function App() {
             <option value="hold">{t('Zum Sprechen halten', 'Hold to talk')}</option><option value="toggle">{t('Start und Stopp per Tastendruck', 'Press to start or stop')}</option>
           </select></Field>
           <label className="check"><input type="checkbox" checked={draft.auto_insert} onChange={(event) => update('auto_insert', event.target.checked)} />
-            {t('Fertigen Text im geprüften Zielfenster einfügen', 'Insert finished text in the verified target window')}</label>
+            {t('Fertigen Text im geprüften Textfeld einfügen', 'Insert finished text in the verified text field')}</label>
           {!initial.insertion_supported && <p className="muted small">{t(
             'Auf dieser Sitzung ist automatisches Einfügen nicht verfügbar. Die Einstellung bleibt für andere Systeme gespeichert; hier nutzt du den Kopieren-Knopf.',
             'Automatic insertion is unavailable in this session. The setting stays saved for other systems; use the Copy button here.',
           )}</p>}
           {initial.insertion_supported && <p className="muted small">{t(
-            'Mehrzeilige Ergebnisse werden mit der Eingabetaste eingefügt. In Feldern, die Enter als Senden deuten, kann das eine Aktion auslösen. Bei Fokuswechsel oder gehaltener Sondertaste wird nicht weiter getippt.',
-            'Multi-line results are inserted with the Return key. In fields where Enter submits, this can trigger an action. Insertion stops on a focus change or a held modifier.',
+            'Unter X11 wird Text direkt in ein erkanntes bearbeitbares Feld geschrieben, ohne Enter auszulösen. Unbekannte oder geschützte Felder, Fokuswechsel und fehlende Feldprüfung bleiben beim Kopieren. Unter Windows werden Absätze nicht automatisch eingefügt.',
+            'On X11, text is written directly to a verified editable field without pressing Enter. Unknown or protected fields, focus changes and unavailable field checks use the copy path. On Windows, paragraphs are not inserted automatically.',
           )}</p>}
           <label className="check"><input type="checkbox" checked={draft.spoken_formatting}
             onChange={(event) => update('spoken_formatting', event.target.checked)} />

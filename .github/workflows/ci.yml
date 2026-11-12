@@ -101,6 +101,7 @@ jobs:
         env:
           CARGO_TARGET_DIR: ${{ github.workspace }}/src-tauri/target
         run: |
+          sudo apt-get install --no-install-recommends -y at-spi2-core dbus-x11
           timeout 300 bash scripts/linux-smoke/x11-insertion.sh
 
   workflows:

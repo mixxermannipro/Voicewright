@@ -228,6 +228,28 @@ Ohne diese realen Modellläufe ist das Issue nicht vollständig abgenommen.
 
 ## Linux: X11-Einfügen und Wayland-Portale (Issue #6)
 
+### Sichere virtuelle Textfelder (Issue #76, DE/EN)
+
+`scripts/linux-smoke/x11-insertion.sh` startet immer einen privaten D-Bus
+und Xvfb. Zusätzlich zu GTK/X11-Bauwerkzeugen braucht der Runner
+`at-spi2-core` und `dbus-x11`; die GTK-Bridge wird nur im Testprozess gesetzt.
+Nie auf einen vorhandenen Nutzer-D-Bus oder `DISPLAY` umleiten.
+
+Der Test prüft den echten Ausgabecode gegen ein externes GTK-Widget:
+Unicode/Emoji/Absatz exakt, **kein Return-Ereignis**, verborgenes Passwortfeld,
+Einzeilentext erfolgreich, Absatz dort blockiert, bestehende Selektion
+unverändert, Fokuswechsel im selben Fenster nach Zielerfassung sowie fehlender
+AT-SPI-Bus. Negative Fälle verlangen den erwarteten Ablehnungsgrund, nicht
+irgendeinen Prozessfehler. Rust-Unit-Tests prüfen Rollen/Zustandsbits und
+Copy-only für unbekannte native Windows-Klassen. Native Windows-/macOS-Tests
+und Qt-/Browser-Verhalten sind dadurch nicht belegt.
+
+The X11 smoke uses a private accessibility bus and synthetic text only.
+Literal field-addressed UTF-8 preserves paragraphs without pressing Enter.
+Unknown/secure fields, selections, focus changes or unavailable metadata must
+not receive text. This is not a Wayland permission workaround, nor proof of
+every toolkit or native Windows behavior. Unconfirmed writes are never retried.
+
 ### Automatisiert
 
 Die Standardprüfungen decken die neue Logik teilweise ab:

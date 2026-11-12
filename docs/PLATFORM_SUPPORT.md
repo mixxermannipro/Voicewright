@@ -9,9 +9,9 @@ veröffentlicht wurden, steht in [PROGRESS.md](PROGRESS.md) und auf
 
 | System | Paket | Globale Taste | Automatisches Einfügen | Wichtige Prüfungen |
 | --- | --- | --- | --- | --- |
-| Windows x64 | NSIS-EXE | native Tauri-Taste | ja, mit Fokusprüfung | Mikrofon in den Datenschutzeinstellungen, Kürzel, Text im externen Fenster, Programm im Infobereich |
+| Windows x64 | NSIS-EXE | native Tauri-Taste | nur native Unicode-Editfelder, einzeilig; nativ noch zu prüfen | Mikrofon in den Datenschutzeinstellungen, Kürzel, Text im externen Fenster, Programm im Infobereich |
 | macOS mit Apple Silicon | DMG | native Tauri-Taste | nein, bewusst kopieren | Mikrofon, Kürzel und Menüleistensymbol. Das Ergebnis wird manuell kopiert. |
-| Linux x64 mit X11 | AppImage, DEB | X11-Tastenbelegung | ja, mit Fokusprüfung | Mikrofon, Kürzel und Text im externen Fenster, Statussymbol abhängig vom Desktop |
+| Linux x64 mit X11 | AppImage, DEB | X11-Tastenbelegung | nur verifiziertes bearbeitbares AT-SPI-Textfeld; sonst Copy | Mikrofon, Kürzel und Text im externen Fenster, Statussymbol abhängig vom Desktop |
 | Linux x64 mit Wayland | Dieselben Linux-Pakete | XDG-Desktop-Portal, nur nach Freigabe | nein, bewusst kopieren | Portal vorhanden und freigegeben, Kürzel außerhalb des Fensters, Kopierweg |
 | macOS mit Intel | Kein Paket im aktuellen Ablauf | native Tauri-Taste | nein, bewusst kopieren | Eigenen Build und praktische Prüfung nachholen |
 
@@ -23,9 +23,9 @@ die App auch in ein fremdes Textfeld tippen darf.
 
 | System | Globale Taste | Automatisches Einfügen |
 | --- | --- | --- |
-| Linux X11 | Tauri-Plugin mit X11-Tastenbelegung | XTest über Enigo, Zielfenster geprüft |
+| Linux X11 | Tauri-Plugin mit X11-Tastenbelegung | Literaler AT-SPI-Textaufruf an das erfasste bearbeitbare Feld, keine Return-Taste |
 | Linux Wayland | XDG `GlobalShortcuts`-Portal | nicht verfügbar; Text bleibt zum Kopieren |
-| Windows | natives Tauri-Plugin | ja, Zielfenster geprüft |
+| Windows | natives Tauri-Plugin | native Edit-Whitelist, keine Passwort-/Readonly-Felder; Absätze Copy-only; nativ ungeprüft |
 | macOS | natives Tauri-Plugin | nein; Text bleibt zum Kopieren |
 
 ## Wayland: GlobalShortcuts-Portal
@@ -85,22 +85,43 @@ Unter X11 prüft Voicewright vor dem Tippen und vor jedem kurzen Stück:
 - die Prozesskennung (`_NET_WM_PID`),
 - ob das Fenster sichtbar ist,
 - ob Shift, Strg, Alt, Super oder AltGr gehalten werden.
+- die eindeutige AT-SPI-Feldidentität im selben Prozess und aktiven Fenster,
+- ob Rolle/Zustände ein sichtbares, fokussiertes, bearbeitbares Textfeld melden;
+  Passwort-, Terminal-, Read-only-, unbekannte und mehrdeutige Ziele blockieren.
 
 Zwischen zwei Proben liegt eine kurze Stabilitätswartezeit. Dadurch wird
-ein Fensterwechsel während der Vorbereitung erkannt. Der Text wird in
-Graphem-Clustern (Zeichen, die zusammengehören) getippt, damit Flaggen,
-Familien-Emoji und kombinierte Zeichen nicht zerteilt werden. Absätze
-werden mit der Eingabetaste eingefügt. CRLF und einzelne CR werden vorher
+ein Fensterwechsel während der Vorbereitung erkannt. Linux schreibt den
+vollständigen UTF-8-Text mit `EditableText.InsertText` direkt an das erfasste
+Feld. Dabei wird keine Return-/Enter-Taste gedrückt; Absätze können dadurch
+nicht allein als Tastaturaktion „Senden“ auslösen. Vorhandene Textselektion
+wird nicht ersetzt: in diesem Fall bleibt der Kopierweg. CRLF und einzelne CR werden vorher
 zu LF normalisiert. Steuerzeichen außer Zeilenumbruch, mehr als 400
 Zeichen und leerer Text bleiben beim Kopieren.
 
-**Grenzen:** Ein Wechsel zwischen zwei Feldern desselben X11-Fensters ist
-nicht zuverlässig erkennbar, wenn das Fenster seine X11-Kennung nicht
-ändert. Passwort- und geschützte Felder werden nicht erkannt. In Feldern,
-die die Eingabetaste als „Senden“ deuten, kann ein mehrzeiliges Diktat
-eine Aktion auslösen; die App weist in den Einstellungen darauf hin. Eine
+**Grenzen:** Die Zielanwendung muss korrekte AT-SPI-Metadaten und die
+Text-/EditableText-Schnittstellen anbieten. Ohne Bus/Bridge, bei unbekanntem
+Widget, falschen Metadaten oder Zeitlimit gibt es keine automatische Ausgabe.
+Es werden keine Zieltexte gelesen, nur Feld-/Fokusmetadaten und Zeichenanzahl.
+Die Prüfungen sind keine atomare Betriebssystem-Sperre gegen jedes denkbare
+Fokus-/App-Rennen. Bei unbestätigter Ausgabe nach einem Aufruf erfolgt kein
+automatischer zweiter Versuch; der Text bleibt mit Warnung verfügbar. Eine
 Wayland-Sitzung wird auch dann als Wayland behandelt, wenn XWayland ein
 `DISPLAY` bereitstellt; dort bleibt es beim Kopierweg.
+
+**English:** X11 insertion is field-addressed literal UTF-8 through AT-SPI,
+never a Return event. Missing/ambiguous/protected field metadata or selections
+mean copy-only. No target text is read. Windows currently allows only verified
+native `Edit` controls and keeps paragraphs copy-only; its native OS behavior
+still needs CI evidence. Neither route is a universal guarantee for custom apps.
+
+Der AT-SPI-Vertrag verwendet Zeichenpositionen für Caret/Zeichenanzahl und
+UTF-8-**Bytes** für die `InsertText`-Länge, siehe
+[offizielle EditableText-Schnittstelle](https://gitlab.gnome.org/GNOME/at-spi2-core/-/blob/main/xml/EditableText.xml).
+Voicewright prüft das Zeichenanzahl-Delta ohne Text auszulesen. Eine
+abweichende Toolkit-Implementierung führt nach dem Aufruf zu „nicht bestätigt“,
+nicht zu blindem Wiederholen. Beobachtbare Cursor-/Selektionsänderungen während
+der Vorbereitung blockieren; ein atomarer Ausschluss aller Rennen ist nicht
+Teil des Protokolls.
 
 ## Getestete Kombinationen
 
@@ -109,7 +130,7 @@ Freigabe für alle Anwendungen.
 
 | Umgebung | Ergebnis | Beleg |
 | --- | --- | --- |
-| Linux X11, Xvfb, GTK-TextView | **Bestanden:** deutscher Text mit Umlauten, ß, Emoji, Flagge, Familien-Emoji, Gedankenstrich und zwei Absätzen kam exakt an. | `scripts/linux-smoke/x11-insertion.sh` mit dem echten Einfüge-Modul |
+| Linux X11, Xvfb, GTK-TextView/Entry, privater AT-SPI-Bus | **Lokal virtuell bestanden am 12.11.2026:** Unicode/Emoji/Absatz exakt ohne Return; Passwort, Selektion, Feldwechsel, fehlender Bus und Absatz im Einzeilenfeld blockiert. Noch kein nativer All-App-Nachweis. | `scripts/linux-smoke/x11-insertion.sh` mit dem echten Einfüge-Modul, netzloser Container |
 | KDE Plasma Wayland, Portal 2 | **Teilweise:** Portal erreichbar, Sitzung anlegen und schließen über `ashpd` bestanden. Freigabedialog und echte Tastenbindung nicht automatisiert. | Manueller Lauf am 10. November 2026 in dieser Sitzung |
 | Linux X11, vollständiges DEB, GTK | **Bestanden am 6. November 2026 mit älterem Stand:** deutsches Diktat, Halten und Umschalten, lokale Korrektur. Mit diesem Branch nicht erneut als DEB geprüft. | [PROGRESS.md](PROGRESS.md), [TESTING.md](TESTING.md) |
 | GNOME Wayland | **Offen:** in dieser Umgebung nicht vorhanden. Die App nutzt denselben Portalweg; Freigabe und Tastenbindung müssen auf GNOME geprüft werden. | Offener Plattformtest |
