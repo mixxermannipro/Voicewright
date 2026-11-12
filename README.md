@@ -1,58 +1,52 @@
 # Voicewright
 
-**Lokale Desktop-Diktier-App · Windows, macOS und Linux · Open Source**
+Voicewright ist eine Diktier-App für Fedora Linux (x86_64). Nach dem Herunterladen eines Whisper-Sprachmodells läuft die Spracherkennung lokal. Voicewright kopiert das fertige Diktat in die Zwischenablage.
 
-Voicewright ist eine kompakte, datensparsame Desktop-Anwendung auf Basis von **Tauri 2, Rust, React und Whisper**. Sie läuft im Hintergrund: Tastenkombination drücken, diktieren, Text sicher am Ziel einfügen – **sofern die Plattform es erlaubt** – oder über einen bewussten Copy-Fallback übernehmen. Das Hauptfenster dient nur Einrichtung und Einstellungen. Das [reduzierte Designkonzept](docs/design/VOICEWRIGHT_UI_CONCEPT.md) nutzt fünf Bereiche, ruhige Dark-/Light-Ansichten und ein unaufdringliches Aufnahme-HUD.
+[Zur englischen Anleitung / English instructions](#english)
 
-> **Stand 12.11.2026: `0.1.0-alpha.1` – keine fertige V1.** Der verbindliche Auftrag ist [V1-Issue #76](https://github.com/mixxermannipro/Voicewright/issues/76). Bis zur fertigen Testversion werden alle Entwicklungsprüfungen **autonom in virtuellen Umgebungen** ausgeführt; persönliche Geräte- und Funktionstests folgen **erst danach** durch den Projekteigentümer.
+## Fedora installieren
 
-## Was aktuell implementiert oder geprüft ist
-
-| Bereich | Stand |
-| --- | --- |
-| Offline-Diktat | Lokale Whisper-basierte Audio-/Speech-Architektur vorhanden, einzelne synthetische Modell-/X11-Tests dokumentiert. Noch keine plattformübergreifende V1-Abnahme |
-| Textkorrektur | Optionaler lokaler Cleanup-Sidecar und freiwillige Providerkonfiguration vorhanden. Cloud nur nach bewusster Konfiguration |
-| Hotkey/Hintergrund/Tray | Wesentliche Funktionen in der Alpha implementiert. Plattform-/Berechtigungstests und V1-End-to-End noch offen |
-| Linux X11 | Virtueller Test mit Xvfb + GTK belegt sichere Unicode- und mehrzeilige Eingabe in einem synthetischen Testfeld |
-| Linux Wayland | GlobalShortcuts-Portal soweit vorhanden; reale Portal-Freigabe und automatisches Fremd-App-Einfügen **nicht** freigegeben/nachgewiesen. Sicherer manueller Copy-Fallback |
-| Windows | Native Grundlagen vorhanden; NSIS und echte/virtuelle End-to-End-Abnahme noch nicht vollständig belegt |
-| macOS | Bisher manueller Copy-Fallback; DMG, native Permissions und tatsächliche globale Textinsertion sind nicht vollständig nachgewiesen |
-| V1-Verteilung | Linux-AppImage/DEB-Paketprüfungen vorhanden; Windows/macOS-Pakete und alle Sicherheits-/Nutzerabnahme-Gates noch offen |
-
-**Keine falschen Versprechen:** Eine grüne CI beweist noch keine echte Mikrofonfreigabe, ein tatsächliches macOS-Accessibility-Dialogverhalten oder systemweite Wayland-Einfügung. Die App zeigt solche Grenzen transparent und bietet einen Fallback.
-
-## Entwicklungsumgebung & Tests
-
-Benötigt: **Node.js 24**, **Rust 1.99.1**, CMake, Clang/libclang und je nach Plattform die Tauri-Systembibliotheken. Zwei unabhängige Cargo-Projekte: `src-tauri/` und `engines/cleanup/`. Für das Cleanup-Sidecar gilt vor Tauri-Builds `npm run prepare:engine`.
+Installiere einmalig die Fedora-Abhängigkeiten.
 
 ```bash
-npm ci
-npm run check && npm run lint && npm test && npm run build
-cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
-cargo test --manifest-path src-tauri/Cargo.toml --locked --all-targets
-cargo test --manifest-path engines/cleanup/Cargo.toml --locked --all-targets
-npm run prepare:engine
-npm run tauri -- build
+sudo dnf install python3.11 python3.11-devel gcc kernel-headers portaudio xcb-util-cursor xcb-util-keysyms xcb-util-wm libxkbcommon-x11 libglvnd-egl mesa-libGL
 ```
 
-Die vollständigen Anforderungen inklusive Clippy, Audits, virtueller Audio-/X11-Tests und OS-Pakete stehen in [VIRTUAL_TESTING.md](docs/VIRTUAL_TESTING.md) und [TESTING.md](docs/TESTING.md). Ein grüner Check für einen bestimmten Commit ist **kein** Nachweis für alle dort geplanten Gates.
+1. Lade das Linux-x86_64-Paket und die passende SHA-256-Datei aus den [GitHub-Releases](https://github.com/mixxermannipro/Voicewright/releases).
+2. Prüfe im Download-Ordner das Paket und entpacke es in einen leeren Ordner. Ersetze gegebenenfalls die Versionsnummer.
 
-## Installation / Systemberechtigungen
+   ```bash
+   sha256sum -c Voicewright-1.0.0-linux-x86_64.tar.gz.sha256
+   mkdir voicewright-install
+   tar -xzf Voicewright-1.0.0-linux-x86_64.tar.gz -C voicewright-install
+   bash voicewright-install/Voicewright/install.sh
+   ```
+3. Starte **Voicewright** im Anwendungsmenü und lade unter **Sprachmodell** ein Modell. Beginne mit **Small** für Deutsch und Englisch oder **Tiny** für einen schnellen ersten Test.
 
-[Installation](docs/INSTALLATION.md) · [Modellverwaltung](docs/MODELS.md) · [Plattformgrenzen](docs/PLATFORM_SUPPORT.md). Voicewright benötigt bei echten Nutzern je nach OS Mikrofon-, Hotkey-/Portal- oder Accessibility-Freigaben. **Diese werden nicht umgangen**. Das autonome Testsystem simuliert freigegebene und abgelehnte Zustände; die echte Erteilung erfolgt **ausschließlich beim späteren freiwilligen Praxistest**.
+Der Installer lädt Python-Abhängigkeiten von PyPI und richtet Voicewright nur für dein Benutzerkonto ein. Für den Start unter Wayland verwendet das Paket XWayland, sofern es läuft. Für XWayland heißt das Paket `xorg-x11-server-Xwayland`.
 
-## Projektsteuerung & Sicherheit
+## Diktieren
 
-- [**V1-Issue #76 – einziger aktiver Arbeitsauftrag**](https://github.com/mixxermannipro/Voicewright/issues/76)
-- [V1-Produktumfang](docs/V1_SCOPE.md) · [virtuelle Teststrategie](docs/VIRTUAL_TESTING.md) · [Repository-Karte](docs/REPOSITORY_MAP.md)
-- [Archiv/Entscheidung aller 35 bisherigen offenen Issues](docs/ISSUE_TRIAGE.md) · [UI-Mockups](docs/design/VOICEWRIGHT_UI_CONCEPT.md)
-- [Tests](docs/TESTING.md) · [Release/Signaturen](docs/RELEASE.md) · [Historische Entwicklung](docs/PROGRESS.md)
-- [Mitwirken](CONTRIBUTING.md) · [Agenten-Anleitung](AGENTS.md) · [Datenschutz](PRIVACY.md) · [Sicherheit](SECURITY.md)
+Starte und stoppe mit der Schaltfläche in den Einstellungen. Unter KDE oder GNOME mit Wayland kannst du für denselben Vorgang in den Systemeinstellungen ein eigenes Tastenkürzel anlegen. Verwende als Befehl den vollständigen Pfad zu `~/.local/bin/voicewright` gefolgt von ` --toggle`. Unter X11 ist standardmäßig `Ctrl+Shift+Leertaste` eingerichtet. Füge den Text danach mit `Ctrl+V` ein.
 
-Quellcode: [MIT-Lizenz](LICENSE); Drittbibliotheken und Modelle haben ihre [eigenen Lizenzbedingungen](docs/THIRD_PARTY_LICENSES.md). Keine Telemetrie oder Ads. Modelle werden lokal verwendet; Downloads kontaktieren die angegebene Quelle. Externe Textkorrektur ist freiwillig und kann Daten zum gewählten Anbieter senden.
+Externe Textkorrektur und lokaler Verlauf sind bei einer frischen Installation ausgeschaltet. Aktivierst du einen Cloud-Dienst, erhält dieser den erkannten Text. API-Schlüssel speichert Voicewright im System-Schlüsselbund.
 
----
+## English
 
-### English
+Download the Linux x86_64 archive and its checksum from [GitHub Releases](https://github.com/mixxermannipro/Voicewright/releases). Verify it with `sha256sum -c`, extract it into an empty directory, then run `bash Voicewright/install.sh` from that directory. Launch **Voicewright** and download a speech model. **Small** works for German and English. **Tiny** is useful for a quick test.
 
-Voicewright is an open-source, offline-first desktop dictation app using Tauri, Rust, React, and local Whisper speech recognition. The **`0.1.0-alpha.1`** version is **not yet a validated V1**. The app aims for global hotkey dictation, a lightweight background tray, safe text insertion when supported and a transparent copy fallback. Privacy-sensitive cloud cleanup is optional. Development and CI must use **autonomous virtual tests without accessing or requesting permissions on the owner's devices**. Physical testing and user feedback happen only **after** a testable V1 candidate exists. See [V1 scope](docs/V1_SCOPE.md), [virtual test matrix](docs/VIRTUAL_TESTING.md), and [tracking issue #76](https://github.com/mixxermannipro/Voicewright/issues/76).
+Start and stop recording using the button in Settings. On Wayland, set a custom GNOME or KDE shortcut to the full path of `~/.local/bin/voicewright` followed by ` --toggle`. On X11 the default shortcut is `Ctrl+Shift+Space`. Paste the finished text with `Ctrl+V`.
+
+Install the Fedora prerequisites shown above. The installer fetches Python dependencies from PyPI and installs Voicewright for the current user. The app uses XWayland when available. Cloud cleanup and local history are off by default. Enabling cloud cleanup sends recognized text to the chosen provider. Keys are stored in the system keyring.
+
+## Entwicklung / Development
+
+Use Python 3.11 in an isolated environment. Install `requirements-dev.txt` and run `python -m pytest -q`. The `check` workflow also verifies the [MIT-licensed Whisper Tiny model](https://huggingface.co/Systran/faster-whisper-tiny) by checksum, recognizes synthetic German and English speech, builds the Linux archive and tests the installed app in a Fedora 45 container with Xvfb and a virtual PulseAudio microphone. Run the equivalent checks locally with:
+
+```bash
+PYTHONPATH=src xvfb-run -a python scripts/smoke-whisper.py /tmp/voicewright-test-model
+bash scripts/build-linux.sh
+xvfb-run -a bash scripts/smoke-linux.sh release/Voicewright-*-linux-x86_64.tar.gz /tmp/voicewright-test-model
+```
+
+The target for this release is Fedora Linux x86_64. Windows and macOS packaging files are included for future work.

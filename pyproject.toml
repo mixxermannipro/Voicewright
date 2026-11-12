@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "voicewright"
+version = "1.0.0"
+description = "Local-first voice dictation: offline Whisper transcription, AI cleanup with your own API key, inserted at your cursor."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+dependencies = [
+  "PySide6-Essentials==6.11.2",
+  "faster-whisper>=1.1.0",
+  "sounddevice>=0.4.6",
+  "numpy>=1.24",
+  "pynput>=1.8.1",
+  "keyring>=24.0",
+]
+
+[project.optional-dependencies]
+dev = ["pyinstaller>=6.6", "pytest>=8", "pillow>=10"]
+
+[project.gui-scripts]
+voicewright = "voicewright.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+voicewright = ["assets/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

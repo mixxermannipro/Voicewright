@@ -18,15 +18,8 @@ Issues mit Exploit-Details, echten Zugangsdaten oder privaten Beispieldiktaten.
 Gib an, ob du den Fehler nur in einer Testumgebung nachgestellt hast.
 Für die private Meldung gibt es keine zugesagte Reaktionszeit oder Bug-Bounty.
 
-## Sicherheitsmodell und verbleibende Einschränkungen
+## Sicherheitsmodell
 
-Das dokumentierte [Bedrohungsmodell](docs/THREAT_MODEL.md) enthält
-Vertrauensgrenzen, konkrete Restrisiken und reproduzierbare Release-Gates.
-Es ist keine Zertifizierung. Insbesondere sind das Einfügen in fremde
-Editoren, importierte native Modelle, benutzerdefinierte Cloud-Endpunkte,
-Signierung/Notarisierung und echte plattformübergreifende Tests noch nicht
-abschließend freigegeben. Bei einem unklaren Zielelement darf keine
-automatische Eingabe erfolgen; das Ergebnis muss kopierbar bleiben.
+Voicewright kopiert Diktate in die System-Zwischenablage. Cloud-Korrektur und lokaler Verlauf sind standardmäßig ausgeschaltet. Das Fedora-Paket ist unsigniert. Prüfe vor der Installation die SHA-256-Datei aus dem GitHub-Release.
 
-Die Projektlizenz steht in [LICENSE](LICENSE). Der Umgang mit Nutzerdaten
-steht in [PRIVACY.md](PRIVACY.md).
+Die Projektlizenz steht in [LICENSE](LICENSE). Der Umgang mit Nutzerdaten steht in [PRIVACY.md](PRIVACY.md).
