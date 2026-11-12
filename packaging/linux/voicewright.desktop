@@ -1,0 +1,19 @@
+[Desktop Entry]
+Type=Application
+Name=Voicewright
+GenericName=Voice Dictation
+GenericName[de]=Sprachdiktat
+Comment=Dictate anywhere – local Whisper transcription with AI cleanup
+Comment[de]=Überall diktieren – lokale Whisper-Transkription mit KI-Bereinigung
+Exec=voicewright
+Icon=voicewright
+Terminal=false
+Categories=Utility;Accessibility;AudioVideo;
+Keywords=dictation;speech;whisper;voice;transcription;diktat;sprache;
+StartupNotify=false
+Actions=Toggle;
+
+[Desktop Action Toggle]
+Name=Start/Stop dictation
+Name[de]=Diktat starten/beenden
+Exec=voicewright --toggle

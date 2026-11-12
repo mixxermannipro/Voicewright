@@ -1,4 +1,9 @@
 # Änderungen
+## 1.0.0
+
+- Python/PySide6 version with local faster-whisper recognition and Fedora x86_64 packaging.
+- Wayland desktop shortcut integration and clipboard output.
+
 
 ## Unveröffentlicht
 
