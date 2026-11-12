@@ -195,7 +195,7 @@ fn request_insertion_permission(state: State<'_, AppState>) -> Result<(), String
     if inner.status.phase.busy() {
         return Err("Finish dictation before requesting desktop permission.".into());
     }
-    if !inner.settings.wayland_insertion_consent {
+    if !inner.settings.auto_insert || !inner.settings.wayland_insertion_consent {
         return Err("Enable and save explicit Wayland output consent first.".into());
     }
     drop(inner);
@@ -295,7 +295,7 @@ fn save_settings(
     }
     let request_output = value.auto_insert
         && value.wayland_insertion_consent
-        && !inner.settings.wayland_insertion_consent;
+        && !(inner.settings.auto_insert && inner.settings.wayland_insertion_consent);
     let disable_output = !value.auto_insert || !value.wayland_insertion_consent;
     inner.settings = value;
     inner.press.reset();
@@ -504,10 +504,10 @@ async fn import_settings_preview(app: AppHandle) -> Result<Option<Settings>, Str
     .await
 }
 
-#[derive(Clone, Copy)]
 enum OutputTarget {
     Native(insertion::Target),
-    Wayland,
+    #[cfg(target_os = "linux")]
+    Wayland(tokio::task::JoinHandle<Option<wayland_output::target::Field>>),
 }
 
 fn start_session(app: &AppHandle, from_hotkey: bool) -> Result<(), String> {
@@ -527,9 +527,18 @@ fn start_session(app: &AppHandle, from_hotkey: bool) -> Result<(), String> {
     let speech_model = models::ready(&root, &settings.speech_model)?;
     let target = if from_hotkey && settings.auto_insert {
         if insertion::session_kind() == insertion::SessionKind::Wayland {
-            (settings.wayland_insertion_consent
-                && state.output.snapshot().state == wayland_output::OutputState::Ready)
-                .then_some(OutputTarget::Wayland)
+            #[cfg(target_os = "linux")]
+            {
+                (settings.wayland_insertion_consent
+                    && state.output.snapshot().state == wayland_output::OutputState::Ready)
+                    .then(|| {
+                        OutputTarget::Wayland(tokio::task::spawn_blocking(
+                            wayland_output::target::capture,
+                        ))
+                    })
+            }
+            #[cfg(not(target_os = "linux"))]
+            None
         } else if insertion::automatic_supported() {
             insertion::target().map(OutputTarget::Native)
         } else {
@@ -742,7 +751,16 @@ async fn pipeline(
                 })
                 .await
             }
-            OutputTarget::Wayland => state.output.insert(result.clone(), capture).await,
+            #[cfg(target_os = "linux")]
+            OutputTarget::Wayland(target) => match target.await {
+                Ok(Some(target)) => {
+                    state
+                        .output
+                        .insert(result.clone(), capture, Some(target))
+                        .await
+                }
+                _ => Err("The active Wayland text field could not be verified.".into()),
+            },
         };
         let mut inner = state.inner.lock().unwrap();
         if inner.session != session {

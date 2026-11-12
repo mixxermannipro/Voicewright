@@ -53,7 +53,12 @@ Für Paketwarnungen und Signaturen siehe [RELEASE.md](RELEASE.md).
 
 ### Linux: Fedora, Ubuntu und Debian
 
-Für Fedora ist **AppImage** vorgesehen, nicht DEB. Nach dem Download:
+Für Fedora sind AppImage und ein separat gebautes Fedora-RPM vorgesehen.
+Ein lokales RPM baut man auf Fedora mit `npm run prepare:engine`, danach
+`npm run tauri -- build --no-bundle -- --locked` und
+`npm run tauri -- bundle --bundles rpm --config src-tauri/tauri.rpm.conf.json`.
+Der letzte Schritt verwendet die RPM-kompatible Paketversion. Das
+Programm selbst behält seine Alpha-Version. AppImage nach dem Download starten:
 
 ```sh
 sha256sum --check SHA256SUMS.txt --ignore-missing

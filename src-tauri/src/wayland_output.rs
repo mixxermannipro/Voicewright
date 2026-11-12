@@ -1,5 +1,9 @@
 //! Explicit permission and bounded, cancellable Wayland text output.
 
+#[cfg(target_os = "linux")]
+pub(crate) mod target;
+
+#[cfg(target_os = "linux")]
 use crate::audio::Capture;
 use serde::Serialize;
 use std::sync::{
@@ -7,7 +11,9 @@ use std::sync::{
     mpsc::{sync_channel, SyncSender},
     Arc, Mutex,
 };
-use tokio::sync::{mpsc, oneshot, watch};
+#[cfg(target_os = "linux")]
+use tokio::sync::oneshot;
+use tokio::sync::{mpsc, watch};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -26,11 +32,16 @@ pub struct Snapshot {
     pub detail: Option<String>,
 }
 
+#[cfg(target_os = "linux")]
 struct Job {
     text: String,
     cancelled: Arc<Capture>,
+    target: target::Field,
     reply: oneshot::Sender<Result<(), String>>,
 }
+#[cfg(not(target_os = "linux"))]
+struct Job;
+
 struct Inner {
     snapshot: Snapshot,
     available: bool,
@@ -131,7 +142,13 @@ impl Controller {
         self.shared.changes.send_replace(epoch);
         let _ = self.shared.events.send(inner.snapshot.clone());
     }
-    pub async fn insert(&self, text: String, cancelled: Arc<Capture>) -> Result<(), String> {
+    #[cfg(target_os = "linux")]
+    pub async fn insert(
+        &self,
+        text: String,
+        cancelled: Arc<Capture>,
+        target: Option<target::Field>,
+    ) -> Result<(), String> {
         if cancelled.cancelled.load(Ordering::SeqCst) {
             return Err("Text output cancelled".into());
         }
@@ -145,11 +162,13 @@ impl Controller {
                 .clone()
                 .ok_or("Desktop text connection is unavailable")?
         };
+        let target = target.ok_or("The active Wayland text field could not be verified.")?;
         let (reply, receiver) = oneshot::channel();
         output
             .try_send(Job {
                 text,
                 cancelled,
+                target,
                 reply,
             })
             .map_err(|_| "Desktop text output is busy or disconnected")?;
@@ -260,14 +279,23 @@ mod linux {
                     while shared.epoch.load(Ordering::SeqCst) == epoch {
                         match receiver.recv_timeout(Duration::from_millis(150)) {
                             Ok(job) => {
-                                let result = if job.cancelled.cancelled.load(Ordering::SeqCst) || shared.epoch.load(Ordering::SeqCst) != epoch {
-                                    Err("Text output cancelled".to_owned())
-                                } else {
-                                    client.send_text(&job.text, &job.cancelled.cancelled, || shared.epoch.load(Ordering::SeqCst) == epoch).map_err(str::to_owned)
-                                };
+                                let still_authorized = || shared.epoch.load(Ordering::SeqCst) == epoch
+                                    && !job.cancelled.cancelled.load(Ordering::SeqCst);
+                                let mut rejected = false;
+                                let result = client.send_text(&job.text, &job.cancelled.cancelled, || {
+                                    let allowed = still_authorized() && target::unchanged(&job.target) && still_authorized();
+                                    rejected = !allowed;
+                                    allowed
+                                }).map_err(str::to_owned);
+                                if rejected {
+                                    let _ = job.reply.send(Err("Wayland text output cancelled or the original field is no longer editable.".into()));
+                                    continue;
+                                }
                                 let failed = result.is_err();
                                 let _ = job.reply.send(result);
-                                if failed { return Err("Desktop text output stopped; check permission before retrying".into()); }
+                                if failed && still_authorized() {
+                                    return Err("Desktop text output stopped; check permission before retrying".into());
+                                }
                             }
                             Err(RecvTimeoutError::Timeout) => {
                                 client.poll()?;
@@ -331,21 +359,26 @@ mod tests {
         assert_ne!(epoch, output.shared.epoch.load(Ordering::SeqCst));
     }
 
+    #[cfg(target_os = "linux")]
     #[tokio::test]
     async fn not_ready_never_dispatches_text() {
         let output = controller(true);
         assert!(output
-            .insert("Private text".into(), Arc::new(Capture::default()))
+            .insert("Private text".into(), Arc::new(Capture::default()), None)
             .await
             .is_err());
     }
 
+    #[cfg(target_os = "linux")]
     #[tokio::test]
     async fn cancelled_capture_is_rejected_before_queueing() {
         let output = controller(true);
         let capture = Arc::new(Capture::default());
         capture.cancelled.store(true, Ordering::SeqCst);
-        assert!(output.insert("Private text".into(), capture).await.is_err());
+        assert!(output
+            .insert("Private text".into(), capture, None)
+            .await
+            .is_err());
     }
 
     #[cfg(target_os = "linux")]
@@ -359,6 +392,22 @@ mod tests {
         assert_eq!(output.snapshot().state, OutputState::Disabled);
     }
 
+    #[cfg(target_os = "linux")]
+    #[tokio::test]
+    async fn a_ready_session_without_a_verified_target_never_enqueues_text() {
+        let output = controller(true);
+        let epoch = output.begin_permission().unwrap();
+        let (sender, receiver) = sync_channel(1);
+        output.update(epoch, OutputState::Ready, None, Some(sender));
+        let error = output
+            .insert("Test text".into(), Arc::new(Capture::default()), None)
+            .await
+            .unwrap_err();
+        assert!(error.contains("could not be verified"));
+        assert!(receiver.try_recv().is_err());
+    }
+
+    #[cfg(target_os = "linux")]
     #[tokio::test]
     async fn a_pending_permission_never_enqueues_text_even_with_a_sender() {
         let output = controller(true);
@@ -366,7 +415,7 @@ mod tests {
         let (sender, receiver) = sync_channel(1);
         output.shared.inner.lock().unwrap().output = Some(sender);
         assert!(output
-            .insert("Private text".into(), Arc::new(Capture::default()))
+            .insert("Private text".into(), Arc::new(Capture::default()), None)
             .await
             .is_err());
         assert!(receiver.try_recv().is_err());

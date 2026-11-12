@@ -200,7 +200,7 @@ impl Client {
         &mut self,
         text: &str,
         cancelled: &AtomicBool,
-        target_ready: impl Fn() -> bool,
+        target_ready: impl FnOnce() -> bool,
     ) -> Result<(), &'static str> {
         let text = prepare_text(text, cancelled)?;
         self.wait_ready(cancelled)?;
