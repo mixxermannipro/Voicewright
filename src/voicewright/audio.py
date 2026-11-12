@@ -94,21 +94,27 @@ class Recorder:
             self._chunks = []
             dev = _device_index(device_name)
             rate = SAMPLE_RATE
+            stream = None
             try:
-                sd.check_input_settings(device=dev, samplerate=SAMPLE_RATE, channels=1, dtype="float32")
-            except Exception:
-                info = sd.query_devices(dev, "input") if dev is not None else sd.query_devices(kind="input")
-                rate = int(info["default_samplerate"])
-            self._rate = rate
-            try:
-                self._stream = sd.InputStream(
+                try:
+                    sd.check_input_settings(device=dev, samplerate=SAMPLE_RATE, channels=1, dtype="float32")
+                except Exception:
+                    info = sd.query_devices(dev, "input") if dev is not None else sd.query_devices(kind="input")
+                    rate = int(info["default_samplerate"])
+                stream = sd.InputStream(
                     samplerate=rate, channels=1, dtype="float32", device=dev,
                     blocksize=int(rate * 0.05), callback=self._callback,
                 )
-                self._stream.start()
+                stream.start()
             except Exception as exc:
-                self._stream = None
+                if stream is not None:
+                    try:
+                        stream.close()
+                    except Exception:
+                        pass
                 raise AudioError(str(exc)) from exc
+            self._rate = rate
+            self._stream = stream
             self.recording = True
 
     def _callback(self, indata, frames, time_info, status) -> None:  # noqa: ARG002

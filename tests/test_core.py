@@ -4,6 +4,8 @@ import os
 import sys
 import tempfile
 import threading
+import urllib.error
+from io import BytesIO
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
@@ -13,6 +15,7 @@ os.environ["VOICEWRIGHT_CONFIG_DIR"] = _tmp
 os.environ["VOICEWRIGHT_DATA_DIR"] = _tmp
 
 import numpy as np  # noqa: E402
+import pytest  # noqa: E402
 
 from voicewright import cleanup  # noqa: E402
 from voicewright.audio import SAMPLE_RATE, _resample, trim_silence  # noqa: E402
@@ -112,6 +115,7 @@ def test_openai_compatible_roundtrip():
     srv = HTTPServer(("127.0.0.1", 0), _Handler)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     c = Config(Path(_tmp) / "cfg3.json")
+    c.set("cleanup_enabled", True)
     c.set("cleanup_provider", "custom")
     c.set("custom_base_url", f"http://127.0.0.1:{srv.server_port}/v1")
     c.set_cleanup_model("custom", "model-a")
@@ -146,3 +150,31 @@ def test_wayland_uses_desktop_shortcut_without_raw_input(monkeypatch):
     manager = hotkey.HotkeyManager()
     assert manager.start("ctrl+shift+space", "evdev") == "none"
     assert manager.error == "WAYLAND_DESKTOP_SHORTCUT"
+
+
+
+def test_provider_error_does_not_expose_echoed_dictation(monkeypatch):
+    def provider_error(request, timeout):
+        raise urllib.error.HTTPError(
+            request.full_url, 400, "Bad Request", {},
+            BytesIO(b'{"error":{"message":"synthetic private dictation"}}'),
+        )
+
+    monkeypatch.setattr(cleanup.urllib.request, "urlopen", provider_error)
+    with pytest.raises(cleanup.CleanupError, match=r"^HTTP 400$"):
+        cleanup._http_json("https://example.invalid", {}, {}, 1)
+
+
+def test_missing_microphone_is_reported_as_audio_error(monkeypatch):
+    from voicewright import audio
+
+    class UnavailableAudio:
+        def check_input_settings(self, **kwargs):
+            raise RuntimeError("Device unavailable")
+
+        def query_devices(self, **kwargs):
+            raise RuntimeError("No default device")
+
+    monkeypatch.setattr(audio, "sd", UnavailableAudio())
+    with pytest.raises(audio.AudioError, match="No default device"):
+        audio.Recorder().start()

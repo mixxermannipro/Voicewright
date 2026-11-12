@@ -203,6 +203,8 @@ class Controller(QObject):
 
     def notify(self, text: str, error: bool = False) -> None:
         log.info("notify: %s", text)
+        if self.settings.isVisible():
+            self.settings.set_status(text)
         if self.tray.isVisible() and QSystemTrayIcon.supportsMessages():
             self.tray.showMessage(APP_NAME, text,
                                   QSystemTrayIcon.Warning if error else QSystemTrayIcon.Information, 5000)

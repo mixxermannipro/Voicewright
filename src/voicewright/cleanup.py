@@ -147,17 +147,10 @@ def _http_json(url: str, payload: Optional[dict], headers: dict, timeout: float,
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return json.loads(r.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
-        body = ""
-        try:
-            body = exc.read().decode("utf-8", "replace")
-            j = json.loads(body)
-            err = j.get("error", j)
-            body = err.get("message", body) if isinstance(err, dict) else str(err)
-        except Exception:
-            pass
-        raise CleanupError(f"HTTP {exc.code}: {body[:300]}") from exc
-    except urllib.error.URLError as exc:
-        raise CleanupError(f"Connection failed: {exc.reason}") from exc
+        exc.close()
+        raise CleanupError(f"HTTP {exc.code}") from None
+    except urllib.error.URLError:
+        raise CleanupError("Connection failed") from None
     except TimeoutError as exc:
         raise CleanupError("Request timed out") from exc
 
@@ -188,7 +181,7 @@ class Cleaner:
         text = text.strip()
         if not text:
             return text
-        if not self.config.get("cleanup_enabled", True):
+        if not self.config.get("cleanup_enabled", False):
             return text
         pid = self.config.get("cleanup_provider", "rules")
         if pid in ("none", ""):
