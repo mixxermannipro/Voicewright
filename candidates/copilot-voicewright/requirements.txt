@@ -1,0 +1,7 @@
+PySide6>=6.6
+faster-whisper>=1.1.0
+sounddevice>=0.4.6
+numpy>=1.24
+pynput>=1.8.1
+keyring>=24.0
+evdev>=1.6; sys_platform == "linux"

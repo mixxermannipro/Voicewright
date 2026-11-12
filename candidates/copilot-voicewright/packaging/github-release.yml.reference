@@ -1,0 +1,99 @@
+name: Build & Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install numpy pytest
+      - run: python -m pytest -q tests
+
+  build:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            name: linux-x86_64
+          - os: windows-latest
+            name: windows-x64
+          - os: macos-14
+            name: macos-arm64
+          # Intel Macs: add a runner with an x86_64 image here if you need it, e.g.
+          # - os: macos-15-intel
+          #   name: macos-x86_64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+
+      - name: Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libportaudio2 libxcb-cursor0 libxkbcommon-x11-0 libegl1 python3-dev
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Build with PyInstaller
+        run: pyinstaller --noconfirm voicewright.spec
+
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p release
+          cp packaging/linux/voicewright.desktop dist/Voicewright/
+          cp packaging/linux/install.sh dist/Voicewright/
+          cp src/voicewright/assets/icon.png dist/Voicewright/voicewright.png
+          chmod +x dist/Voicewright/install.sh
+          tar -C dist -czf release/Voicewright-${{ github.ref_name }}-${{ matrix.name }}.tar.gz Voicewright
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path release | Out-Null
+          Compress-Archive -Path dist/Voicewright/* -DestinationPath "release/Voicewright-${{ github.ref_name }}-${{ matrix.name }}-portable.zip"
+          $version = (python -c "import sys; sys.path.insert(0,'src'); import voicewright; print(voicewright.__version__)")
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DAppVersion=$version" "/DSourceDir=$PWD\dist\Voicewright" "/DOutputDir=$PWD\release" packaging\windows\voicewright.iss
+
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p release
+          codesign --force --deep --sign - dist/Voicewright.app || true
+          hdiutil create -volname Voicewright -srcfolder dist/Voicewright.app -ov -format UDZO \
+            release/Voicewright-${{ github.ref_name }}-${{ matrix.name }}.dmg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Voicewright-${{ matrix.name }}
+          path: release/*
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: artifacts, merge-multiple: true }
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true
