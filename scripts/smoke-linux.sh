@@ -19,7 +19,7 @@ export VOICEWRIGHT_CONFIG_DIR="$scratch/config"
 export VOICEWRIGHT_DATA_DIR="$scratch/data"
 # Model Fedora Wayland's desktop-managed shortcut via IPC, with a virtual X
 # display for Qt's XWayland clipboard path.
-export XDG_SESSION_TYPE=wayland QT_QPA_PLATFORM=xcb
+export XDG_SESSION_TYPE=wayland QT_QPA_PLATFORM=xcb PYTHONFAULTHANDLER=1
 export PULSE_SERVER="unix:$scratch/pulse.sock"
 export ALSA_CONFIG_PATH="$scratch/asound.conf"
 mkdir -m 700 -p -- "$HOME" "$XDG_RUNTIME_DIR" "$VOICEWRIGHT_CONFIG_DIR" "$VOICEWRIGHT_DATA_DIR/models"
@@ -92,11 +92,12 @@ check_dictation en-us 'This is a simple test. Today we are talking about the wea
 timeout 10 "$app" --quit
 for _ in {1..40}; do
     if ! kill -0 "$app_pid" 2>/dev/null; then
-        wait "$app_pid"
+        if ! wait "$app_pid"; then cat "$scratch/startup.log"; exit 1; fi
         app_pid=
         echo 'Installed application transcribed both languages and accepted its quit command.'
         exit 0
     fi
     sleep .25
 done
+cat "$scratch/startup.log"
 exit 1
