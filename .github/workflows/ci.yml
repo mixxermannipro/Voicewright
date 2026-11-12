@@ -21,7 +21,7 @@ jobs:
       - name: Install Fedora test dependencies
         run: |
           dnf -y --setopt=install_weak_deps=False install git tar gzip findutils util-linux-core \
-            python3.11 python3.11-devel gcc kernel-headers portaudio xcb-util-cursor \
+            python3.11 python3.11-devel gcc kernel-headers portaudio xcb-util-cursor xcb-util-keysyms xcb-util-wm \
             libxkbcommon-x11 libglvnd-egl mesa-libGL xorg-x11-server-Xvfb xauth xclip \
             espeak-ng pulseaudio pulseaudio-utils alsa-plugins-pulseaudio
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803

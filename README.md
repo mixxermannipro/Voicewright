@@ -9,7 +9,7 @@ Voicewright ist eine Diktier-App für Fedora Linux (x86_64). Nach dem Herunterla
 Installiere einmalig die Fedora-Abhängigkeiten.
 
 ```bash
-sudo dnf install python3.11 python3.11-devel gcc kernel-headers portaudio xcb-util-cursor libxkbcommon-x11
+sudo dnf install python3.11 python3.11-devel gcc kernel-headers portaudio xcb-util-cursor xcb-util-keysyms xcb-util-wm libxkbcommon-x11 libglvnd-egl mesa-libGL
 ```
 
 1. Lade das Linux-x86_64-Paket und die passende SHA-256-Datei aus den [GitHub-Releases](https://github.com/mixxermannipro/Voicewright/releases).

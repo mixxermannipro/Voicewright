@@ -9,7 +9,7 @@ install_root="$HOME/.local/opt"
 
 python_bin=${VOICEWRIGHT_PYTHON:-python3.11}
 if ! command -v "$python_bin" >/dev/null; then
-    printf 'Install Fedora prerequisites first: sudo dnf install python3.11 python3.11-devel gcc kernel-headers portaudio xcb-util-cursor libxkbcommon-x11
+    printf 'Install Fedora prerequisites first: sudo dnf install python3.11 python3.11-devel gcc kernel-headers portaudio xcb-util-cursor xcb-util-keysyms xcb-util-wm libxkbcommon-x11 libglvnd-egl mesa-libGL
 ' >&2
     exit 1
 fi
