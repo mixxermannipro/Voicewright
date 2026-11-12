@@ -39,6 +39,15 @@ pub enum RecordingMode {
     Toggle,
 }
 
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum Theme {
+    #[default]
+    System,
+    Light,
+    Dark,
+}
+
 /// Optional style guidance on top of the conservative default instruction.
 /// `Minimal` adds nothing; the other modes must not change facts.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
@@ -71,6 +80,11 @@ pub struct Settings {
     pub spoken_formatting: bool,
     pub fallback: bool,
     pub auto_insert: bool,
+    pub wayland_insertion_consent: bool,
+    pub theme: Theme,
+    pub start_in_background: bool,
+    pub autostart: bool,
+    pub show_hud: bool,
     pub shortcut: String,
     pub cancel_shortcut: String,
     pub recording_mode: RecordingMode,
@@ -99,6 +113,11 @@ impl Default for Settings {
             spoken_formatting: false,
             fallback: true,
             auto_insert: true,
+            wayland_insertion_consent: false,
+            theme: Theme::System,
+            start_in_background: true,
+            autostart: false,
+            show_hud: false,
             shortcut: "Ctrl+Shift+Space".into(),
             cancel_shortcut: String::new(),
             recording_mode: RecordingMode::Hold,
@@ -215,6 +234,29 @@ impl Settings {
             ),
         }
         prompt
+    }
+}
+
+#[cfg(test)]
+mod output_consent_tests {
+    use super::*;
+
+    #[test]
+    fn legacy_settings_never_imply_wayland_output_permission() {
+        let settings: Settings = serde_json::from_str("{}").unwrap();
+        assert_eq!(
+            serde_json::to_value(settings).unwrap()["wayland_insertion_consent"],
+            false
+        );
+    }
+
+    #[test]
+    fn old_settings_get_safe_desktop_defaults() {
+        let value = serde_json::to_value(serde_json::from_str::<Settings>("{}").unwrap()).unwrap();
+        assert_eq!(value["theme"], "system");
+        assert_eq!(value["autostart"], false);
+        assert_eq!(value["start_in_background"], true);
+        assert_eq!(value["show_hud"], false);
     }
 }
 

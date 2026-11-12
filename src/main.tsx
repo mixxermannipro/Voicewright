@@ -7,6 +7,8 @@ import {
   type Initial, type Kind, type Phase, type Provider, type ProviderConfig, type Settings, type Status,
 } from './domain';
 import { FirstRunGuide } from './FirstRunGuide';
+import { Hud } from './Hud';
+import { WaylandPermission } from './WaylandPermission';
 import './style.css';
 
 type Copy = (de: string, en: string) => string;
@@ -182,6 +184,9 @@ function App() {
     } catch (cause) { setError(String(cause)); }
   };
 
+  const wayland = initial.session_type === 'wayland';
+  const outputState = status?.insertion_state ?? initial.insertion_state;
+  const outputReady = saved.auto_insert && outputState === 'ready' && (!wayland || saved.wayland_insertion_consent);
   const installed = status?.installed ?? [];
   const labels = {
     dashboard: t('Übersicht', 'Overview'), models: t('Modelle', 'Models'), cleanup: t('Textkorrektur', 'Text editing'),
@@ -259,10 +264,11 @@ function App() {
           {' '}<button type="button" onClick={() => void run('retry_shortcuts')}>{t('Freigabe erneut anfragen', 'Request permission again')}</button>
         </p>}
         {status?.shortcut_state === 'active' && status?.shortcut_detail && <p className="message" role="status">{status.shortcut_detail}</p>}
-        {!initial.insertion_supported && initial.session_type === 'wayland' && <p className="message">
-          {t('Wayland: Automatisches Einfügen ist nicht verfügbar. Erkannte Texte gehen nicht verloren: Sie bleiben in Voicewright und lassen sich mit „Kopieren“ bewusst übernehmen.',
-            'Wayland: Automatic insertion is unavailable. Recognized text is never lost: it stays in Voicewright and can be copied deliberately.')}
-        </p>}
+        {wayland && saved.auto_insert && !outputReady && <div className="message">
+          <p>{t('Für automatisches Einfügen braucht Voicewright die Wayland-Tastaturfreigabe.',
+            'Voicewright needs Wayland keyboard permission to insert automatically.')}</p>
+          <button type="button" onClick={() => moveTo('settings')}>{t('Einfügen einrichten', 'Set up automatic insertion')}</button>
+        </div>}
         {!initial.insertion_supported && initial.session_type !== 'wayland' && initial.shortcut_backend !== 'unsupported' && <p className="message">
           {t('Automatisches Einfügen ist auf diesem System nicht verfügbar. Erkannte Texte bleiben in Voicewright und lassen sich bewusst kopieren.',
             'Automatic insertion is unavailable on this system. Recognized text stays in Voicewright and can be copied deliberately.')}
@@ -281,7 +287,7 @@ function App() {
             <div><dt>{t('Textkorrektur', 'Text editing')}</dt><dd>{saved.cleanup_mode === 'off' ? t('Aus', 'Off') : saved.cleanup_mode === 'local' ? modelName(saved.cleanup_model) : providers[saved.active_provider]}</dd></div>
             <div><dt>{t('Mikrofon', 'Microphone')}</dt><dd>{saved.microphone ? t('Ausgewähltes Gerät', 'Selected device') : t('Systemstandard', 'System default')}</dd></div>
             <div><dt>{t('Globale Taste', 'Global shortcut')}</dt><dd>{shortcutLabel}</dd></div>
-            <div><dt>{t('Automatisches Einfügen', 'Automatic insertion')}</dt><dd>{initial.insertion_supported ? t('Verfügbar', 'Available') : t('Nur Kopieren', 'Copy only')}</dd></div>
+            <div><dt>{t('Automatisches Einfügen', 'Automatic insertion')}</dt><dd>{outputReady ? t('Bereit', 'Ready') : t('Nur Kopieren', 'Copy only')}</dd></div>
           </dl>
           <div className="actions">
             {phase === 'recording'
@@ -403,12 +409,23 @@ function App() {
             <option value="hold">{t('Zum Sprechen halten', 'Hold to talk')}</option><option value="toggle">{t('Start und Stopp per Tastendruck', 'Press to start or stop')}</option>
           </select></Field>
           <label className="check"><input type="checkbox" checked={draft.auto_insert} onChange={(event) => update('auto_insert', event.target.checked)} />
-            {t('Fertigen Text im geprüften Zielfenster einfügen', 'Insert finished text in the verified target window')}</label>
-          {!initial.insertion_supported && <p className="muted small">{t(
+            {t('Fertigen Text automatisch einfügen', 'Insert finished text automatically')}</label>
+          {wayland && draft.auto_insert && <>
+            <label className="check"><input type="checkbox" checked={draft.wayland_insertion_consent}
+              onChange={(event) => update('wayland_insertion_consent', event.target.checked)} />
+              {t('Tastatureingabe über das Desktop-Portal erlauben', 'Allow keyboard input through the desktop portal')}</label>
+            <p className="muted small">{t(
+              'Speichern öffnet die Systemfreigabe. Klicke vor dem Diktat in ein normales Textfeld und lass den Schreibcursor dort, bis der Text erscheint. Voicewright fügt nur ein, wenn es das Textfeld prüfen kann.',
+              'Saving opens the desktop permission prompt. Before dictating, click a normal text field and leave the caret there until the text appears. Voicewright inserts only when it can verify the text field.',
+            )}</p>
+            <WaylandPermission state={outputState} enabled={saved.auto_insert && saved.wayland_insertion_consent}
+              busy={busy || saving || !draft.wayland_insertion_consent} t={t} onRequest={() => void run('request_insertion_permission')} />
+          </>}
+          {!wayland && !initial.insertion_supported && <p className="muted small">{t(
             'Auf dieser Sitzung ist automatisches Einfügen nicht verfügbar. Die Einstellung bleibt für andere Systeme gespeichert; hier nutzt du den Kopieren-Knopf.',
             'Automatic insertion is unavailable in this session. The setting stays saved for other systems; use the Copy button here.',
           )}</p>}
-          {initial.insertion_supported && <p className="muted small">{t(
+          {!wayland && initial.insertion_supported && <p className="muted small">{t(
             'Mehrzeilige Ergebnisse werden mit der Eingabetaste eingefügt. In Feldern, die Enter als Senden deuten, kann das eine Aktion auslösen. Bei Fokuswechsel oder gehaltener Sondertaste wird nicht weiter getippt.',
             'Multi-line results are inserted with the Return key. In fields where Enter submits, this can trigger an action. Insertion stops on a focus change or a held modifier.',
           )}</p>}
@@ -631,4 +648,4 @@ function ProviderCredentials({ config, t, changeModel }: { config: ProviderConfi
   </>;
 }
 
-createRoot(document.getElementById('root')!).render(<App />);
+createRoot(document.getElementById('root')!).render(new URLSearchParams(window.location.search).has('hud') ? <Hud /> : <App />);

@@ -108,6 +108,7 @@ dependencies = [
  "futures-util",
  "getrandom 0.4.3",
  "serde",
+ "serde_repr",
  "tokio",
  "zbus 6.2.1",
 ]
@@ -5276,6 +5277,7 @@ dependencies = [
  "futures-util",
  "hound",
  "keyring",
+ "libloading 0.8.9",
  "reqwest 0.12.28",
  "serde",
  "serde_json",

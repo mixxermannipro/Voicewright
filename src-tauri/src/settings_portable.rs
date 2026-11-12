@@ -118,6 +118,8 @@ pub fn import(bytes: &[u8]) -> Result<Settings, String> {
     // A microphone ID is specific to the originating machine.
     settings.cleanup_mode = CleanupMode::Off;
     settings.microphone = None;
+    settings.wayland_insertion_consent = false;
+    settings.autostart = false;
     // An imported backup describes a different device: microphone access,
     // available model files and shortcuts need a fresh guided check.
     settings.onboarding_step = 0;
@@ -130,6 +132,20 @@ pub fn import(bytes: &[u8]) -> Result<Settings, String> {
 mod tests {
     use super::*;
     use crate::settings::SETTINGS_SCHEMA_VERSION;
+
+    #[test]
+    fn importing_never_reuses_desktop_input_consent() {
+        let settings = Settings {
+            wayland_insertion_consent: true,
+            autostart: true,
+            ..Settings::default()
+        };
+        let bytes = serde_json::to_vec(&json!({
+            "format": "voicewright-settings", "schema_version": SETTINGS_SCHEMA_VERSION, "settings": settings,
+        })).unwrap();
+        assert!(!import(&bytes).unwrap().wayland_insertion_consent);
+        assert!(!import(&bytes).unwrap().autostart);
+    }
 
     #[test]
     fn legacy_alpha_and_two_older_migrations_are_idempotent() {

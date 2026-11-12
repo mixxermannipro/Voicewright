@@ -12,7 +12,7 @@ veröffentlicht wurden, steht in [PROGRESS.md](PROGRESS.md) und auf
 | Windows x64 | NSIS-EXE | native Tauri-Taste | ja, mit Fokusprüfung | Mikrofon in den Datenschutzeinstellungen, Kürzel, Text im externen Fenster, Programm im Infobereich |
 | macOS mit Apple Silicon | DMG | native Tauri-Taste | nein, bewusst kopieren | Mikrofon, Kürzel und Menüleistensymbol. Das Ergebnis wird manuell kopiert. |
 | Linux x64 mit X11 | AppImage, DEB | X11-Tastenbelegung | ja, mit Fokusprüfung | Mikrofon, Kürzel und Text im externen Fenster, Statussymbol abhängig vom Desktop |
-| Linux x64 mit Wayland | Dieselben Linux-Pakete | XDG-Desktop-Portal, nur nach Freigabe | nein, bewusst kopieren | Portal vorhanden und freigegeben, Kürzel außerhalb des Fensters, Kopierweg |
+| Fedora KDE Wayland x64 | Fedora-RPM, AppImage | GlobalShortcuts-Portal | nach Tastaturfreigabe und Prüfung des Textfelds | vollständiges Diktat auf dem Desktop praktisch abnehmen |
 | macOS mit Intel | Kein Paket im aktuellen Ablauf | native Tauri-Taste | nein, bewusst kopieren | Eigenen Build und praktische Prüfung nachholen |
 
 ## Hotkey und Texteingabe sind getrennte Fähigkeiten
@@ -24,7 +24,7 @@ die App auch in ein fremdes Textfeld tippen darf.
 | System | Globale Taste | Automatisches Einfügen |
 | --- | --- | --- |
 | Linux X11 | Tauri-Plugin mit X11-Tastenbelegung | XTest über Enigo, Zielfenster geprüft |
-| Linux Wayland | XDG `GlobalShortcuts`-Portal | nicht verfügbar; Text bleibt zum Kopieren |
+| Fedora KDE Wayland | XDG `GlobalShortcuts`-Portal | Tastaturfreigabe, EIS-Text und AT-SPI-Fokusprüfung erforderlich |
 | Windows | natives Tauri-Plugin | ja, Zielfenster geprüft |
 | macOS | natives Tauri-Plugin | nein; Text bleibt zum Kopieren |
 
@@ -60,21 +60,21 @@ Tasten in den Einstellungen, wird die Portal-Sitzung geschlossen und mit
 den neuen Bindungen neu angefragt. Meldet der Desktop eine Änderung der
 freigegebenen Bindungen, aktualisiert die App den angezeigten Zustand.
 
-**Bewusste Grenze:** Voicewright fragt weder das `Input`- noch das
-`RemoteDesktop`-Portal an. Beide würden eine breite Fernsteuerungs-
-Berechtigung verlangen, die weit über das Einfügen eines Diktats
-hinausgeht. Es gibt keine Root-, `uinput`-, `sudo`- oder Keylogging-
-Umgehung. Wenn der Desktop keine globale Taste oder keine Texteingabe
-erlaubt, bleibt der Weg über das App-Fenster und die Zwischenablage.
+## Wayland: Automatisches Einfügen
 
-## Wayland: Warum kein automatisches Einfügen
+Aktiviere unter **Einstellungen → Tastenkürzel und Einfügen** die
+Tastatureingabe über das Desktop-Portal. Bestätige nach dem Speichern die
+Tastaturfreigabe des Desktops. Sie ist von der globalen Tastenkombination
+getrennt und kann beim nächsten Start erneut erforderlich sein.
 
-Ein normaler Wayland-Client kann keine Tastendrücke in ein fremdes Fenster
-senden. Voicewright behauptet das deshalb nicht. Der erkannte Text wird
-nach der Aufnahme in der App angezeigt und bleibt dort, bis der Nutzer ihn
-bewusst kopiert. Die Zwischenablage wird nicht im Hintergrund verändert
-und nicht gelöscht. Ein fehlgeschlagenes Einfügen führt nie dazu, dass das
-Ergebnis verloren geht.
+Klicke in ein gewöhnliches Textfeld und lass den Schreibcursor bis zum
+Einfügen dort. Voicewright prüft über AT-SPI (Schnittstelle für
+Barrierefreiheit), ob das Feld beim Start und vor der Ausgabe fokussiert und
+editierbar ist. Ohne eindeutig prüfbares Feld, etwa bei einem Passwortfeld,
+Fokuswechsel oder fehlender Schnittstelle, bleibt der Text in Voicewright
+zum Kopieren. Die Prüfung liest Feldmerkmale, keinen Feldinhalt. Die
+Ausgabe erfolgt mit libei 1.6 oder neuer als Text, ohne Bildschirmaufnahme,
+Maussteuerung oder automatischen Zugriff auf die Zwischenablage.
 
 ## X11: Fokusprüfung, Unicode und Absätze
 
@@ -100,7 +100,7 @@ nicht zuverlässig erkennbar, wenn das Fenster seine X11-Kennung nicht
 die die Eingabetaste als „Senden“ deuten, kann ein mehrzeiliges Diktat
 eine Aktion auslösen; die App weist in den Einstellungen darauf hin. Eine
 Wayland-Sitzung wird auch dann als Wayland behandelt, wenn XWayland ein
-`DISPLAY` bereitstellt; dort bleibt es beim Kopierweg.
+`DISPLAY` bereitstellt. Dort gelten die Wayland-Anforderungen oben.
 
 ## Getestete Kombinationen
 

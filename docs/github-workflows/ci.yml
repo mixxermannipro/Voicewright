@@ -78,7 +78,7 @@ jobs:
       - name: Check and test the native code
         run: |
           cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings
-          cargo test --manifest-path src-tauri/Cargo.toml --locked
+          cargo test --manifest-path src-tauri/Cargo.toml --locked --all-targets
           cargo clippy --manifest-path engines/cleanup/Cargo.toml --locked --all-targets -- -D warnings
           cargo test --manifest-path engines/cleanup/Cargo.toml --locked
 

@@ -2,6 +2,102 @@
 
 > **Historische Entwicklungsnachweise.** Seit **12.11.2026** ist nur noch [V1-Issue #76](https://github.com/mixxermannipro/Voicewright/issues/76) mit [V1_SCOPE.md](V1_SCOPE.md) und [VIRTUAL_TESTING.md](VIRTUAL_TESTING.md) der aktuelle Arbeitsauftrag. Die alten Issues #39/#47 und ihre manuellen Zwischenfreigaben wurden ersetzt. Alle während der Entwicklung erforderlichen Tests sollen **autonom virtuell** stattfinden; der Eigentümer testet den fertigen Kandidaten einmal ganz am Ende und gibt dann Feedback. Historische Tests und ältere Branch-Anweisungen unten sind nicht automatisch aktuelle Freigabenachweise.
 
+## Lokaler Fedora-Kandidat am 12. November 2026
+
+Die Einstellungen bieten jetzt die getrennte Wayland-Tastaturfreigabe
+und zeigen an, ob die Textausgabe bereit ist. Vor dem Senden muss sich das
+ursprüngliche Textfeld als weiterhin fokussiert und editierbar prüfen lassen.
+Bei fehlender Freigabe oder einem ungeeigneten Feld bleibt der Text zum
+Kopieren in Voicewright. Der Fedora-RPM-Bau verwendet eine eigene
+Paketversionsschreibweise und enthält die lokale Korrektur-Engine.
+
+## V1 für Fedora – Planung am 11. November 2026
+
+`main` wurde auf `a62cd84` aktualisiert; die neue Aufgabe läuft auf
+`feat/v1-fedora-release`. Der Anwender fordert automatisches Einfügen auch
+unter Fedora Wayland ausdrücklich als Pflichtfunktion. Der
+[V1-Entwurf](superpowers/specs/2026-11-11-v1-fedora-design.md) ist vom Anwender
+freigegeben; der [Implementierungsplan](superpowers/plans/2026-11-11-v1-fedora.md)
+ist ebenfalls bestätigt und wird ohne weitere Umfangsfragen umgesetzt.
+Ein isolierter Wayland-Prüfer ist implementiert, aber noch kein
+V1-Ausgabebackend in die App integriert und kein Release erstellt.
+Issues werden erst nach der Umsetzung abgeglichen, nicht zur
+Arbeitsauswahl verwendet. Die vorhandene unversionierte
+`.github/workflows/platforms.yml` bleibt unangetastet.
+
+**Ausgangsstand lokal geprüft:** `npm run check`, `npm run lint`, `npm test`
+(12 Tests), `npm run build` und `npm audit --audit-level=high` (0 Treffer)
+bestanden. Beide Cargo-Projekte bestanden Formatierung und Clippy mit
+`--all-targets -- -D warnings`; App/Parser: 96 Tests bestanden, zwei
+Modelltests übersprungen; Cleanup/Protokoll: 9 bestanden, ein Modelltest
+übersprungen. 7 Python-Paketprüfertests und die 6 gezielt erneut ausgeführten
+Vitest-Paketvertragstests bestanden. Ein vorheriger Aufruf der Vitest-Datei
+mit dem Node-Testläufer war ein falscher Prüfaufruf, kein Produktfehler.
+
+**Umgebung:** Fedora 45 KDE Plasma 6.8.2, Wayland. Das lokale Desktop-Portal
+meldet RemoteDesktop v2, Clipboard v1 und GlobalShortcuts v2. Nur die
+Schnittstellen wurden ausgelesen; keine neue Berechtigung erteilt und kein
+automatisches Einfügen nachgewiesen. GitHub-CI-Lauf
+[43030588241](https://github.com/mixxermannipro/Voicewright/actions/runs/43030588241)
+ist für `a62cd84` erfolgreich. Das ist keine praktische V1-/Fedora-Abnahme.
+
+**Bestätigte Produktentscheidungen:** Ausgabe unter Wayland ins aktuell aktive
+Feld; erneute Freigabe beim App-Start ist akzeptiert. Die beiden kostenlosen
+Katalogmodelle dürfen außerhalb Git heruntergeladen und geprüft werden.
+RPM/AppImage, Fünf-Bereiche-Oberfläche und die Abnahmebedingungen sind
+freigegeben. Drei DeepSeek-Helferprüfungen wurden geliefert; zwei weitere
+Wayland-Recherchen scheiterten am kostenlosen Nutzungslimit. Diese Prüfung
+übernimmt der Haupt-Agent ohne bezahltes Ersatzmodell.
+
+**Echte Modelltests dieses Ausgangsstands:** Beide Kataloggewichte wurden
+nach ausdrücklicher Zustimmung außerhalb Git geladen; Dateigröße und SHA-256
+stimmen. Der Whisper-Test mit synthetischen DE/EN-WAVs (7,87 s), der
+Qwen-DE/EN-Protokolltest (8,10 s) und der 19-Fälle-Guard-Vergleich (24,81 s)
+bestanden. Keine echte Mikrofon-/Wayland-Ausgabeabnahme und kein Nachweis
+eines allgemeinen Korrekturvorteils daraus ableiten.
+
+**Wayland-Vorprüfung:** `src-tauri/examples/wayland_output_probe.rs` fordert
+explizit nur Keyboard-Portalrechte an und kann einen festen öffentlichen
+Einzeiler ausgeben. Vier Unit-Tests wurden erst rot, dann grün nachgewiesen.
+Die echte Prüfung im Modus `permission` endete nach 60 Sekunden ohne
+bestätigte Desktopfreigabe. Es wurde kein Text eingegeben; der Prüfer beendet
+die Sitzung. Einzelheiten und ausstehende Tests: [WAYLAND_OUTPUT.md](WAYLAND_OUTPUT.md).
+Dieser ursprüngliche Blocker wurde nach erneuter Freigabe überwunden:
+Keyboard-only-Sitzung geöffnet/geschlossen; direkte EIS-UTF8-Ausgabe in ein
+natives GTK-Wayland-Testfeld kam exakt an (45 Zeichen, inklusive Umlaute,
+ß, Emoji, Absatz und korrekter Groß-/Kleinschreibung). Der Keysym-Versuch
+bestand den exakten Vergleich nicht und wird nicht der V1-Transport.
+Der gewählte Weg benötigt `libei >= 1.6`, fordert nur Textfähigkeit an und
+fasst die Zwischenablage nicht an. Acht Prüfer-/Texttests bestanden.
+Die App-Integration verwendet nun denselben EIS-Textkanal mit gesonderter
+Einwilligung (Standard aus), begrenzter Warteschlange, Abbruchflag und
+Sitzungsgeneration. Veraltete Freigaben dürfen Ausgabe nicht wieder aktivieren;
+Imports übernehmen keine Einwilligung. Pending/Ready/Denied/Error werden
+an die Oberfläche gemeldet. Mikrofontests geben niemals extern aus.
+Die vollständige Paket-/Desktopabnahme ist noch offen;
+kein Copy-only-Release und keine Issue-Schließung aus der Vorprüfung ableiten.
+
+**Hintergrundbetrieb:** Neue rückwärtsverträgliche Einstellungen für
+System/Hell/Dunkel, Hintergrundstart, bewussten Linux-Autostart und optionales
+HUD. Pause bricht aktive Erkennung ab und invalidiert spätere Ausgabe.
+Erststart, Konfigurationsfehler und fehlendes Tray lassen das Hauptfenster
+sichtbar. Linux-Autostart verwaltet nur den eigenen markierten Desktop-Eintrag;
+fremde Dateien/Symlinks und ungeeignete oder fehlende Programmdateien werden
+abgewiesen. Imports aktivieren weder Autostart noch Wayland-Eingaberechte.
+Das HUD bleibt auf Wayland aus, weil die Fokuslosigkeit dort nicht belegt ist;
+Tray und Einstellungen bleiben als Statuswege verfügbar. X11-HUD-Fokus und
+realer Autostart nach Anmeldung bleiben praktisch zu prüfen.
+
+**Abschlussprüfung des Zwischenstands:** 107 App-/Beispieltests und 10
+Cleanup-Tests mit `--all-targets -- --include-ignored` einschließlich echter
+Gewichte bestanden, ohne übersprungene Tests. Beide fmt-/Clippy-Prüfungen,
+12 npm-Tests, Typprüfung, Lint, Web-Build, npm-Audit (0 Treffer) und 7
+Python-Paketprüfertests bestanden. CI und gesicherte CI-Vorlage verwenden
+für die App jetzt `--all-targets`, da der vorherige Aufruf die vier neuen
+Example-Tests nicht ausführte. Eine unabhängige Codeprüfung war wegen des
+DeepSeek-Gratislimits nicht verfügbar; nur Selbstprüfung, keine unabhängige
+Merge-Freigabe. Der anschließende GitHub-Lauf scheiterte vor dem Codebau an
+Timeouts beim Azure-Ubuntu-Paketserver; das ist kein nachgewiesener Rustfehler.
 
 Der Alpha-Stand aus [PR #1](https://github.com/mixxermannipro/Voicewright/pull/1)
 wurde am 7. November 2026 nach `main` integriert. Der Zweig

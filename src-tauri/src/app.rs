@@ -1,9 +1,9 @@
 use crate::{
     audio::{self, Capture},
-    cleanup, guard, hotkeys, insertion, models, providers,
+    cleanup, desktop_integration, guard, hotkeys, insertion, models, providers,
     session::{apply_shortcut_changes, Action, HotkeyState, Phase, ShortcutKind, Status},
     settings::{self, CleanupMode, RecordingMode, Settings},
-    settings_portable, speech, spoken_format,
+    settings_portable, speech, spoken_format, wayland_output,
 };
 use serde::Serialize;
 use std::{
@@ -18,7 +18,7 @@ use std::{
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
-    AppHandle, Manager, State, WindowEvent,
+    AppHandle, Emitter, Manager, State, WindowEvent,
 };
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
@@ -28,6 +28,7 @@ struct AppState {
     hardware: Hardware,
     tray_available: AtomicBool,
     clipboard: Mutex<Option<arboard::Clipboard>>,
+    output: wayland_output::Controller,
     inner: Mutex<Inner>,
 }
 
@@ -49,6 +50,7 @@ fn migrate_legacy_data(root: &Path) {
 }
 
 struct Inner {
+    paused: bool,
     settings: Settings,
     status: Status,
     capture: Option<Arc<Capture>>,
@@ -82,6 +84,7 @@ struct Hardware {
 
 #[derive(Serialize)]
 struct StatusView {
+    paused: bool,
     phase: Phase,
     elapsed_ms: u64,
     level: f32,
@@ -92,6 +95,8 @@ struct StatusView {
     shortcut_detail: Option<String>,
     shortcut_active: bool,
     shortcut_state: hotkeys::ShortcutStatus,
+    insertion_state: wayland_output::OutputState,
+    insertion_detail: Option<String>,
     download: Option<Download>,
     installed: Vec<String>,
 }
@@ -113,7 +118,8 @@ struct Initial {
     shortcut_backend: hotkeys::Backend,
     shortcut_state: hotkeys::ShortcutStatus,
     insertion_supported: bool,
-    insertion_detail: Option<&'static str>,
+    insertion_detail: Option<String>,
+    insertion_state: wayland_output::OutputState,
     session_type: insertion::SessionKind,
     tray_available: bool,
     model_path: PathBuf,
@@ -123,14 +129,16 @@ struct Initial {
 #[tauri::command]
 fn initial(state: State<'_, AppState>) -> Initial {
     let inner = state.inner.lock().unwrap();
+    let output = output_status(&state);
     Initial {
         settings: inner.settings.clone(),
         catalog: models::CATALOG,
         hardware: state.hardware.clone(),
         shortcut_backend: hotkeys::backend(),
         shortcut_state: inner.shortcut_state,
-        insertion_supported: insertion::automatic_supported(),
-        insertion_detail: insertion::unavailable_reason(),
+        insertion_supported: output.state == wayland_output::OutputState::Ready,
+        insertion_detail: output.detail,
+        insertion_state: output.state,
         session_type: insertion::session_kind(),
         tray_available: state.tray_available.load(Ordering::Relaxed),
         model_path: state.models(),
@@ -141,7 +149,9 @@ fn initial(state: State<'_, AppState>) -> Initial {
 #[tauri::command]
 fn status(state: State<'_, AppState>) -> StatusView {
     let inner = state.inner.lock().unwrap();
+    let output = output_status(&state);
     StatusView {
+        paused: inner.paused,
         phase: inner.status.phase,
         elapsed_ms: inner
             .status
@@ -157,9 +167,45 @@ fn status(state: State<'_, AppState>) -> StatusView {
         shortcut_detail: inner.shortcut_detail.clone(),
         shortcut_active: inner.shortcut_active,
         shortcut_state: inner.shortcut_state,
+        insertion_state: output.state,
+        insertion_detail: output.detail,
         download: inner.download.clone(),
         installed: models::installed(&state.models()),
     }
+}
+
+fn output_status(state: &AppState) -> wayland_output::Snapshot {
+    if insertion::session_kind() == insertion::SessionKind::Wayland {
+        state.output.snapshot()
+    } else {
+        wayland_output::Snapshot {
+            state: if insertion::automatic_supported() {
+                wayland_output::OutputState::Ready
+            } else {
+                wayland_output::OutputState::Unavailable
+            },
+            detail: insertion::unavailable_reason().map(str::to_owned),
+        }
+    }
+}
+
+#[tauri::command]
+fn request_insertion_permission(state: State<'_, AppState>) -> Result<(), String> {
+    let inner = state.inner.lock().unwrap();
+    if inner.status.phase.busy() {
+        return Err("Finish dictation before requesting desktop permission.".into());
+    }
+    if !inner.settings.auto_insert || !inner.settings.wayland_insertion_consent {
+        return Err("Enable and save explicit Wayland output consent first.".into());
+    }
+    drop(inner);
+    state.output.request_permission();
+    Ok(())
+}
+
+#[tauri::command]
+fn disable_insertion_permission(state: State<'_, AppState>) {
+    state.output.disconnect();
 }
 
 #[tauri::command]
@@ -211,6 +257,7 @@ fn save_settings(
     }
     let backend = hotkeys::backend();
     let native = matches!(backend, hotkeys::Backend::X11 | hotkeys::Backend::Native);
+    let rebind_portal = should_rebind_shortcuts(&inner.settings, &value);
     let previous = if native && inner.shortcut_active {
         shortcuts(&inner.settings)
     } else {
@@ -220,7 +267,22 @@ fn save_settings(
     if native {
         replace_shortcuts(&app, &previous, &next)?;
     }
+    let autostart_changed = value.autostart != inner.settings.autostart;
+    if autostart_changed {
+        if let Err(error) = configure_autostart(&app, value.autostart) {
+            if native && replace_shortcuts(&app, &next, &previous).is_err() {
+                inner.shortcut_active = false;
+                inner.shortcut_state = hotkeys::ShortcutStatus::Error;
+                return Err(format!("{error} Shortcut rollback failed."));
+            }
+            return Err(error);
+        }
+    }
     if let Err(error) = settings::save(&state.settings(), &value) {
+        let mut error = error;
+        if autostart_changed && configure_autostart(&app, inner.settings.autostart).is_err() {
+            error.push_str(" Autostart rollback failed; inspect the desktop setting.");
+        }
         if native {
             let rollback = replace_shortcuts(&app, &next, &previous);
             if rollback.is_err() {
@@ -231,6 +293,10 @@ fn save_settings(
         }
         return Err(error);
     }
+    let request_output = value.auto_insert
+        && value.wayland_insertion_consent
+        && !(inner.settings.auto_insert && inner.settings.wayland_insertion_consent);
+    let disable_output = !value.auto_insert || !value.wayland_insertion_consent;
     inner.settings = value;
     inner.press.reset();
     match backend {
@@ -241,13 +307,15 @@ fn save_settings(
             inner.shortcut_state = hotkeys::ShortcutStatus::Active;
         }
         hotkeys::Backend::Portal => {
-            if let Some(portal) = &inner.portal {
-                portal.rebind(hotkeys::bindings(&inner.settings));
+            if rebind_portal {
+                if let Some(portal) = &inner.portal {
+                    portal.rebind(hotkeys::bindings(&inner.settings));
+                }
+                inner.shortcut_error = None;
+                inner.shortcut_detail = None;
+                inner.shortcut_active = false;
+                inner.shortcut_state = hotkeys::ShortcutStatus::Pending;
             }
-            inner.shortcut_error = None;
-            inner.shortcut_detail = None;
-            inner.shortcut_active = false;
-            inner.shortcut_state = hotkeys::ShortcutStatus::Pending;
         }
         hotkeys::Backend::Unsupported => {
             inner.shortcut_error = None;
@@ -256,7 +324,58 @@ fn save_settings(
             inner.shortcut_state = hotkeys::ShortcutStatus::Unavailable;
         }
     }
+    drop(inner);
+    if disable_output {
+        state.output.disconnect();
+    } else if request_output {
+        state.output.request_permission();
+    }
     Ok(())
+}
+
+fn should_rebind_shortcuts(before: &Settings, after: &Settings) -> bool {
+    hotkeys::bindings(before) != hotkeys::bindings(after)
+}
+
+fn configure_autostart(app: &AppHandle, enabled: bool) -> Result<bool, String> {
+    #[cfg(target_os = "linux")]
+    {
+        let config = app
+            .path()
+            .config_dir()
+            .map_err(|_| "Could not locate desktop configuration.")?;
+        let executable = if enabled {
+            std::env::var_os("APPIMAGE")
+                .map(PathBuf::from)
+                .map(Ok)
+                .unwrap_or_else(std::env::current_exe)
+                .map_err(|_| "Could not locate the application executable.")?
+        } else {
+            PathBuf::new()
+        };
+        desktop_integration::set_autostart(&config, &executable, enabled)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = app;
+        if enabled {
+            Err("Autostart is not implemented on this platform.".into())
+        } else {
+            Ok(false)
+        }
+    }
+}
+
+#[tauri::command]
+fn set_autostart(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    enabled: bool,
+) -> Result<bool, String> {
+    let mut value = state.inner.lock().unwrap().settings.clone();
+    value.autostart = enabled;
+    save_settings(app, state, value)?;
+    Ok(enabled)
 }
 
 #[tauri::command]
@@ -385,11 +504,20 @@ async fn import_settings_preview(app: AppHandle) -> Result<Option<Settings>, Str
     .await
 }
 
+enum OutputTarget {
+    Native(insertion::Target),
+    #[cfg(target_os = "linux")]
+    Wayland(tokio::task::JoinHandle<Option<wayland_output::target::Field>>),
+}
+
 fn start_session(app: &AppHandle, from_hotkey: bool) -> Result<(), String> {
     let state = app.state::<AppState>();
     let mut inner = state.inner.lock().unwrap();
     if inner.status.phase.busy() {
         return Err("A dictation is already in progress.".into());
+    }
+    if inner.paused {
+        return Err("Dictation is paused.".into());
     }
     if inner.transfer.is_some() && !inner.download.as_ref().is_some_and(|item| item.active) {
         return Err("Finish importing the model before recording.".into());
@@ -397,8 +525,25 @@ fn start_session(app: &AppHandle, from_hotkey: bool) -> Result<(), String> {
     let settings = inner.settings.clone();
     let root = state.models();
     let speech_model = models::ready(&root, &settings.speech_model)?;
-    let target = if from_hotkey && settings.auto_insert && insertion::automatic_supported() {
-        insertion::target()
+    let target = if from_hotkey && settings.auto_insert {
+        if insertion::session_kind() == insertion::SessionKind::Wayland {
+            #[cfg(target_os = "linux")]
+            {
+                (settings.wayland_insertion_consent
+                    && state.output.snapshot().state == wayland_output::OutputState::Ready)
+                    .then(|| {
+                        OutputTarget::Wayland(tokio::task::spawn_blocking(
+                            wayland_output::target::capture,
+                        ))
+                    })
+            }
+            #[cfg(not(target_os = "linux"))]
+            None
+        } else if insertion::automatic_supported() {
+            insertion::target().map(OutputTarget::Native)
+        } else {
+            None
+        }
     } else {
         None
     };
@@ -452,16 +597,24 @@ fn start_session(app: &AppHandle, from_hotkey: bool) -> Result<(), String> {
 }
 
 fn set_tray_status(app: &AppHandle, phase: Phase, has_warning: bool) {
+    update_hud(app, phase);
     let Some(tray) = app.tray_by_id("main") else {
         return;
     };
-    let text = match phase {
-        Phase::Recording => "Voicewright · ● Aufnahme / Recording",
-        Phase::Transcribing => "Voicewright · Spracherkennung / Transcribing",
-        Phase::Cleaning => "Voicewright · Textkorrektur / Editing",
-        Phase::Failed => "Voicewright · Fehler / Error",
-        Phase::Completed if has_warning => "Voicewright · Text zum Kopieren / Text ready to copy",
-        _ => "Voicewright",
+    let paused = app.state::<AppState>().inner.lock().unwrap().paused;
+    let text = if paused {
+        "Voicewright · Pausiert / Paused"
+    } else {
+        match phase {
+            Phase::Recording => "Voicewright · ● Aufnahme / Recording",
+            Phase::Transcribing => "Voicewright · Spracherkennung / Transcribing",
+            Phase::Cleaning => "Voicewright · Textkorrektur / Editing",
+            Phase::Failed => "Voicewright · Fehler / Error",
+            Phase::Completed if has_warning => {
+                "Voicewright · Text zum Kopieren / Text ready to copy"
+            }
+            _ => "Voicewright",
+        }
     };
     let _ = tray.set_tooltip(Some(text));
     let image = if phase == Phase::Recording {
@@ -493,7 +646,7 @@ async fn pipeline(
     settings: &Settings,
     model_root: &Path,
     speech_model: &Path,
-    target: Option<insertion::Target>,
+    target: Option<OutputTarget>,
     control: Arc<Capture>,
     session: u64,
 ) -> Result<(), String> {
@@ -591,10 +744,24 @@ async fn pipeline(
             return Ok(());
         }
         let capture = control.clone();
-        let inserted = blocking(move || {
-            insertion::insert(target, &result, &capture.cancelled).map_err(str::to_owned)
-        })
-        .await;
+        let inserted = match target {
+            OutputTarget::Native(target) => {
+                blocking(move || {
+                    insertion::insert(target, &result, &capture.cancelled).map_err(str::to_owned)
+                })
+                .await
+            }
+            #[cfg(target_os = "linux")]
+            OutputTarget::Wayland(target) => match target.await {
+                Ok(Some(target)) => {
+                    state
+                        .output
+                        .insert(result.clone(), capture, Some(target))
+                        .await
+                }
+                _ => Err("The active Wayland text field could not be verified.".into()),
+            },
+        };
         let mut inner = state.inner.lock().unwrap();
         if inner.session != session {
             return Ok(());
@@ -607,9 +774,13 @@ async fn pipeline(
         let message = if !settings.auto_insert {
             "The result is available to copy in Voicewright."
         } else {
-            insertion::unavailable_reason().unwrap_or(
+            if insertion::session_kind() == insertion::SessionKind::Wayland {
+                "Wayland output permission is not ready. The result is available to copy."
+            } else {
+                insertion::unavailable_reason().unwrap_or(
                 "The target window could not be verified. The result is available to copy in Voicewright.",
             )
+            }
         };
         append_warning(&mut warning, message.into());
     }
@@ -752,6 +923,77 @@ fn cancel(app: AppHandle) {
     inner.status.inserted = false;
     drop(inner);
     set_tray_status(&app, Phase::Cancelled, false);
+}
+
+fn pause_state(inner: &mut Inner, paused: bool) {
+    inner.paused = paused;
+    inner.press.reset();
+    if paused && inner.status.phase.busy() {
+        if let Some(capture) = &inner.capture {
+            capture.cancelled.store(true, Ordering::SeqCst);
+            capture.stop.store(true, Ordering::SeqCst);
+        }
+        inner.session = inner.session.wrapping_add(1);
+        inner.capture = None;
+        inner.status.recording_since = None;
+        inner.status.phase = Phase::Cancelled;
+        inner.status.inserted = false;
+    }
+}
+
+#[tauri::command]
+fn set_paused(app: AppHandle, paused: bool) {
+    let phase = {
+        let state = app.state::<AppState>();
+        let mut inner = state.inner.lock().unwrap();
+        pause_state(&mut inner, paused);
+        inner.status.phase
+    };
+    set_tray_status(&app, phase, false);
+}
+
+fn update_hud(app: &AppHandle, phase: Phase) {
+    // Wayland does not provide a verified focusless overlay contract here.
+    // Never risk taking focus from the text target for optional decoration.
+    if insertion::session_kind() != insertion::SessionKind::X11 {
+        return;
+    }
+    let enabled = app
+        .state::<AppState>()
+        .inner
+        .lock()
+        .unwrap()
+        .settings
+        .show_hud;
+    let visible = enabled && (phase.busy() || phase == Phase::Failed);
+    let window = app.get_webview_window("hud").or_else(|| {
+        if !visible {
+            return None;
+        }
+        tauri::WebviewWindowBuilder::new(
+            app,
+            "hud",
+            tauri::WebviewUrl::App("index.html?hud=1".into()),
+        )
+        .title("Voicewright")
+        .inner_size(300.0, 86.0)
+        .decorations(false)
+        .resizable(false)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .focused(false)
+        .focusable(false)
+        .visible(false)
+        .build()
+        .ok()
+    });
+    if let Some(window) = window {
+        if visible {
+            let _ = window.show();
+        } else {
+            let _ = window.hide();
+        }
+    }
 }
 
 #[tauri::command]
@@ -927,7 +1169,14 @@ fn show(app: &AppHandle) {
 }
 
 fn tray(app: &AppHandle) -> tauri::Result<()> {
-    let open = MenuItem::with_id(app, "open", "Voicewright öffnen / Open", true, None::<&str>)?;
+    let open = MenuItem::with_id(app, "open", "Einstellungen / Settings", true, None::<&str>)?;
+    let pause = MenuItem::with_id(
+        app,
+        "pause",
+        "Pause / Fortsetzen · Pause / Resume",
+        true,
+        None::<&str>,
+    )?;
     let stop_item = MenuItem::with_id(app, "stop", "Aufnahme beenden / Stop", true, None::<&str>)?;
     let cancel_item = MenuItem::with_id(
         app,
@@ -938,12 +1187,19 @@ fn tray(app: &AppHandle) -> tauri::Result<()> {
     )?;
     let copy = MenuItem::with_id(app, "copy", "Text kopieren / Copy", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Beenden / Quit", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&open, &stop_item, &cancel_item, &copy, &quit])?;
+    let menu = Menu::with_items(
+        app,
+        &[&open, &pause, &stop_item, &cancel_item, &copy, &quit],
+    )?;
     let mut tray = TrayIconBuilder::with_id("main")
         .menu(&menu)
         .tooltip("Voicewright")
         .on_menu_event(|app, event| match event.id().as_ref() {
             "open" => show(app),
+            "pause" => {
+                let paused = app.state::<AppState>().inner.lock().unwrap().paused;
+                set_paused(app.clone(), !paused);
+            }
             "stop" => stop(app.state()),
             "cancel" => cancel(app.clone()),
             "copy" => {
@@ -1006,6 +1262,8 @@ pub fn run() {
                 }
             };
             let system = sysinfo::System::new_all();
+            let (output, mut output_events) = wayland_output::start();
+            let request_output = settings.auto_insert && settings.wayland_insertion_consent;
             app.manage(AppState {
                 root,
                 hardware: Hardware {
@@ -1018,7 +1276,9 @@ pub fn run() {
                 },
                 tray_available: AtomicBool::new(false),
                 clipboard: Mutex::new(None),
+                output,
                 inner: Mutex::new(Inner {
+                    paused: false,
                     settings,
                     status,
                     capture: None,
@@ -1035,6 +1295,15 @@ pub fn run() {
                 }),
             });
             let state = app.state::<AppState>();
+            let event_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                while let Some(snapshot) = output_events.recv().await {
+                    let _ = event_handle.emit("insertion-status", snapshot);
+                }
+            });
+            if request_output {
+                state.output.request_permission();
+            }
             state
                 .tray_available
                 .store(tray(app.handle()).is_ok(), Ordering::Relaxed);
@@ -1083,6 +1352,19 @@ pub fn run() {
                 }
                 hotkeys::Backend::Unsupported => {}
             }
+            let visible = {
+                let inner = state.inner.lock().unwrap();
+                desktop_integration::should_show_main(
+                    inner.settings.onboarding_complete,
+                    inner.settings.start_in_background,
+                    state.tray_available.load(Ordering::Relaxed),
+                    inner.status.warning.is_some(),
+                    std::env::args().any(|arg| arg == "--settings"),
+                )
+            };
+            if visible {
+                show(app.handle());
+            }
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -1099,10 +1381,14 @@ pub fn run() {
             status,
             microphones,
             save_settings,
+            set_autostart,
+            set_paused,
             default_settings,
             export_settings,
             import_settings_preview,
             retry_shortcuts,
+            request_insertion_permission,
+            disable_insertion_permission,
             preview_cleanup,
             start_test,
             stop,
@@ -1127,6 +1413,50 @@ mod tests {
     use super::*;
 
     const APP_IDENTIFIER: &str = "de.voicewright.desktop";
+
+    #[test]
+    fn pause_cancels_active_capture_and_invalidates_late_output() {
+        let capture = Arc::new(Capture::default());
+        let mut inner = Inner {
+            paused: false,
+            settings: Settings::default(),
+            status: Status {
+                phase: Phase::Recording,
+                recording_since: Some(Instant::now()),
+                ..Status::default()
+            },
+            capture: Some(capture.clone()),
+            shortcut_error: None,
+            shortcut_active: false,
+            shortcut_state: hotkeys::ShortcutStatus::Unknown,
+            shortcut_detail: None,
+            portal: None,
+            press: HotkeyState::default(),
+            session: 7,
+            started_from_hotkey: true,
+            transfer: None,
+            download: None,
+        };
+        pause_state(&mut inner, true);
+        assert!(inner.paused);
+        assert!(capture.cancelled.load(Ordering::SeqCst));
+        assert!(capture.stop.load(Ordering::SeqCst));
+        assert_ne!(inner.session, 7);
+        assert!(inner.capture.is_none());
+        assert_eq!(inner.status.phase, Phase::Cancelled);
+        pause_state(&mut inner, false);
+        assert!(!inner.paused);
+    }
+
+    #[test]
+    fn saving_output_permission_does_not_reopen_shortcut_dialogs() {
+        let before = Settings::default();
+        let mut after = before.clone();
+        after.wayland_insertion_consent = true;
+        assert!(!should_rebind_shortcuts(&before, &after));
+        after.shortcut = "Ctrl+Alt+D".into();
+        assert!(should_rebind_shortcuts(&before, &after));
+    }
 
     #[test]
     fn moves_legacy_app_data_only_when_the_new_directory_is_absent() {
