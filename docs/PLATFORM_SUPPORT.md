@@ -1,5 +1,8 @@
 # Plattformen
 
+> **V1-Teststatus ab 12.11.2026:** Vor der persönlichen Feedbackrunde gelten nur in [VIRTUAL_TESTING.md](VIRTUAL_TESTING.md) belegt automatisierte Tests auf CI-/virtuellen OS-Runners als Kandidatengates. Die unten genannten Plattformfähigkeiten sind teilweise **geplant, implementiert oder lokal eingeschränkt geprüft**, aber keine pauschale Zusage für alle nativen Anwendungen. Echte Portal-/TCC-/Mikrofon- und Accessibility-Freigaben werden **erst beim späteren freiwilligen Eigentümer-Praxistest** geprüft; bis dahin den sicheren Copy-Fallback nutzen und Ungeprüftes markieren. Niemals Systemrechte automatisiert umgehen.
+
+
 Die Tabelle nennt die vorgesehenen Pakete. Ob sie aktuell gebaut und
 veröffentlicht wurden, steht in [PROGRESS.md](PROGRESS.md) und auf
 [GitHub Releases](https://github.com/mixxermannipro/Voicewright/releases).

@@ -1,5 +1,10 @@
 # Vorabversion veröffentlichen
 
+> **Neue V1-Regel 12.11.2026:** Nicht vorab öffentlich veröffentlichen oder einen V1-Stable-Tag setzen. Zuerst aus grüner, **vollständig autonomer virtueller** CI installierbare Kandidatenpakete als **private/unveröffentlichte GitHub-Actions-Artefakte** mit SHA-256 bereitstellen. **Keine persönliche Gerät-/Mikrofon-/Wayland-/Accessibility-Freigabe als Zwischen-Gate verlangen.** Erst der Eigentümer testet den fertigen Kandidaten auf seinem eigenen Rechner und gibt „funktioniert / funktioniert nicht“-Feedback. Danach Fehler beheben und **nur mit ausdrücklichem Sign-off** veröffentlichten Release erzeugen. [V1_SCOPE.md](V1_SCOPE.md) · [VIRTUAL_TESTING.md](VIRTUAL_TESTING.md) · [#76](https://github.com/mixxermannipro/Voicewright/issues/76).
+
+Die nachfolgende bisherige **taggetriggerte** Alpha-Release-Anleitung bleibt technische Referenz, nicht eine Aufforderung, jetzt einen Tag zu pushen. Ohne Herstellerzertifikate sind Windows/macOS-Pakete möglicherweise unsigniert bzw. nicht notarisiert; deren Risiken und die später ggf. nötige normale OS-Freigabe gehören in die Nutzeranleitung, niemals in einen automatisierten Berechtigungs-Bypass.
+
+
 Aktiviere zuerst die [GitHub-Workflows](github-workflows/README.md).
 
 Die GitHub-Pipeline akzeptiert Tags (benannte Versionsstände) der Form

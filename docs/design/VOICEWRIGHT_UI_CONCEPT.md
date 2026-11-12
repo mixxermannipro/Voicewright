@@ -1,5 +1,8 @@
 # Voicewright – verbindliches UI/UX-Konzept (November 2026)
 
+> **V1-Pflichtreferenz ab 12.11.2026:** Diese Mockups bleiben der verbindliche minimalistische Look. Ein *virtuell* geprüfter V1-Testkandidat wird gemäß [V1_SCOPE.md](../V1_SCOPE.md) und [VIRTUAL_TESTING.md](../VIRTUAL_TESTING.md) gebaut; der Eigentümer prüft die tatsächliche Darstellung **erst am Ende** und gibt Feedback. Design-Mockups sind keine implementierten oder funktional geprüften Screens.
+
+
 > **Freigegebenes Gestaltungsziel:** leise, minimalistische Desktop-Hintergrund-App. Globaler Hotkey → aufnehmen → lokal transkribieren → sicher einfügen bzw. kopieren. Das Hauptfenster ist **nur für Einrichtung und Einstellungen** gedacht, nicht als dauerhaftes Diktierstudio. Die Abbildungen sind **Design-Mockups**, keine Screenshots einer fertigen Implementierung.
 
 ## Mockups
