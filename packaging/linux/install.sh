@@ -7,15 +7,24 @@ apps_dir="$HOME/.local/share/applications"
 icons_dir="$HOME/.local/share/icons/hicolor/512x512/apps"
 install_root="$HOME/.local/opt"
 
-test -x "$source_dir/voicewright"
-test -d "$source_dir/_internal"
+python_bin=${VOICEWRIGHT_PYTHON:-python3.11}
+if ! command -v "$python_bin" >/dev/null; then
+    printf 'Install Fedora prerequisites first: sudo dnf install python3.11 python3.11-devel gcc kernel-headers portaudio xcb-util-cursor libxkbcommon-x11
+' >&2
+    exit 1
+fi
+wheels=("$source_dir"/voicewright-*.whl)
+test "${#wheels[@]}" -eq 1 && test -f "${wheels[0]}"
 mkdir -p -- "$bin_dir" "$apps_dir" "$icons_dir" "$install_root"
 dest=$(mktemp -d "$install_root/voicewright.XXXXXXXX")
-cp -a -- "$source_dir/voicewright" "$source_dir/_internal" "$dest/"
-ln -sfn -- "$dest/voicewright" "$bin_dir/voicewright"
+"$python_bin" -m venv "$dest"
+"$dest/bin/python" -m pip --disable-pip-version-check install \
+    --index-url https://pypi.org/simple --constraint "$source_dir/constraints-linux.txt" "${wheels[0]}"
+"$dest/bin/python" -m pip check
+ln -sfn -- "$dest/bin/voicewright" "$bin_dir/voicewright"
 install -m 644 -- "$source_dir/voicewright.png" "$icons_dir/voicewright.png"
 # Desktop files expand neither $HOME nor ~ in Exec.
-python3 - "$source_dir/voicewright.desktop" "$apps_dir/voicewright.desktop" "$bin_dir/voicewright" <<'PY'
+"$python_bin" - "$source_dir/voicewright.desktop" "$apps_dir/voicewright.desktop" "$bin_dir/voicewright" <<'PY'
 import sys
 from pathlib import Path
 

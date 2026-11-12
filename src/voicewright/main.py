@@ -6,7 +6,6 @@ import getpass
 import logging
 import os
 import sys
-from pathlib import Path
 from logging.handlers import RotatingFileHandler
 
 from voicewright import APP_ID, APP_NAME, __version__
@@ -69,11 +68,6 @@ def main(argv: list[str] | None = None) -> int:
     if args.command in ("stop", "cancel", "quit"):
         print(f"{APP_NAME} is not running.", file=sys.stderr)
         return 1
-
-    if sys.platform.startswith("linux") and getattr(sys, "frozen", False):
-        ca_bundle = Path("/etc/ssl/certs/ca-certificates.crt")
-        if ca_bundle.is_file():
-            os.environ.setdefault("SSL_CERT_FILE", str(ca_bundle))
 
     if sys.platform.startswith("linux") and os.environ.get("DISPLAY"):
         # XWayland bridges the clipboard even when dictation was started by

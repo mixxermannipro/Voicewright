@@ -16,6 +16,10 @@ log = logging.getLogger(__name__)
 def _launch_command() -> list[str]:
     if getattr(sys, "frozen", False):
         return [sys.executable, "--minimized"]
+    if IS_LINUX:
+        installed = Path.home() / ".local" / "bin" / APP_ID
+        if installed.is_file():
+            return [str(installed), "--minimized"]
     return [sys.executable, "-m", "voicewright", "--minimized"]
 
 

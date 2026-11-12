@@ -4,11 +4,14 @@ cd -- "$(dirname -- "$0")/.."
 version=$(PYTHONPATH=src python -c 'from voicewright import __version__; print(__version__)')
 name="Voicewright-${version}-linux-x86_64.tar.gz"
 test "$(uname -m)" = x86_64
-python -m PyInstaller --noconfirm voicewright.spec
-install -m 755 packaging/linux/install.sh dist/Voicewright/install.sh
-install -m 644 packaging/linux/voicewright.desktop dist/Voicewright/
-install -m 644 src/voicewright/assets/icon.png dist/Voicewright/voicewright.png
-install -m 644 LICENSE dist/Voicewright/
-mkdir -p release
-tar -C dist -czf "release/$name" Voicewright
+scratch=$(mktemp -d)
+trap 'rm -rf -- "$scratch"' EXIT
+bundle="$scratch/Voicewright"
+mkdir -p -- "$bundle" release
+python -m pip wheel --no-deps --wheel-dir "$bundle" .
+python -m pip freeze > "$bundle/constraints-linux.txt"
+install -m 755 packaging/linux/install.sh "$bundle/"
+install -m 644 packaging/linux/voicewright.desktop LICENSE README.md "$bundle/"
+install -m 644 src/voicewright/assets/icon.png "$bundle/voicewright.png"
+tar -C "$scratch" -czf "release/$name" Voicewright
 (cd release && sha256sum "$name" > "$name.sha256")

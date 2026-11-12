@@ -6,6 +6,12 @@ Voicewright ist eine Diktier-App für Fedora Linux (x86_64). Nach dem Herunterla
 
 ## Fedora installieren
 
+Installiere einmalig die Fedora-Abhängigkeiten.
+
+```bash
+sudo dnf install python3.11 python3.11-devel gcc kernel-headers portaudio xcb-util-cursor libxkbcommon-x11
+```
+
 1. Lade das Linux-x86_64-Paket und die passende SHA-256-Datei aus den [GitHub-Releases](https://github.com/mixxermannipro/Voicewright/releases).
 2. Prüfe im Download-Ordner das Paket und entpacke es in einen leeren Ordner. Ersetze gegebenenfalls die Versionsnummer.
 
@@ -17,7 +23,7 @@ Voicewright ist eine Diktier-App für Fedora Linux (x86_64). Nach dem Herunterla
    ```
 3. Starte **Voicewright** im Anwendungsmenü und lade unter **Sprachmodell** ein Modell. Beginne mit **Small** für Deutsch und Englisch oder **Tiny** für einen schnellen ersten Test.
 
-Der Installer richtet Voicewright nur für dein Benutzerkonto ein. Für den Start unter Wayland verwendet das Paket XWayland, sofern es läuft. Falls Bibliotheken fehlen, installiere die Fedora-Pakete `portaudio`, `xcb-util-cursor` und `libxkbcommon-x11`. Für XWayland heißt das Paket `xorg-x11-server-Xwayland`.
+Der Installer lädt Python-Abhängigkeiten von PyPI und richtet Voicewright nur für dein Benutzerkonto ein. Für den Start unter Wayland verwendet das Paket XWayland, sofern es läuft. Für XWayland heißt das Paket `xorg-x11-server-Xwayland`.
 
 ## Diktieren
 
@@ -31,16 +37,16 @@ Download the Linux x86_64 archive and its checksum from [GitHub Releases](https:
 
 Start and stop recording using the button in Settings. On Wayland, set a custom GNOME or KDE shortcut to the full path of `~/.local/bin/voicewright` followed by ` --toggle`. On X11 the default shortcut is `Ctrl+Shift+Space`. Paste the finished text with `Ctrl+V`.
 
-The Linux bundle uses XWayland when available. If runtime libraries are missing, install Fedora's `portaudio`, `xcb-util-cursor`, `libxkbcommon-x11` and, for XWayland, `xorg-x11-server-Xwayland`. Cloud cleanup and local history are off by default. Enabling cloud cleanup sends recognized text to the chosen provider. Keys are stored in the system keyring.
+Install the Fedora prerequisites shown above. The installer fetches Python dependencies from PyPI and installs Voicewright for the current user. The app uses XWayland when available. Cloud cleanup and local history are off by default. Enabling cloud cleanup sends recognized text to the chosen provider. Keys are stored in the system keyring.
 
 ## Entwicklung / Development
 
-Use Python 3.11 in an isolated environment. Install `requirements-dev.txt` and run `python -m pytest -q`. The `check` workflow also verifies the [MIT-licensed Whisper Tiny model](https://huggingface.co/Systran/faster-whisper-tiny) by checksum, recognizes synthetic German and English speech, builds the Linux archive and launches the installed app under Xvfb (a virtual X11 display). Run the equivalent checks locally with:
+Use Python 3.11 in an isolated environment. Install `requirements-dev.txt` and run `python -m pytest -q`. The `check` workflow also verifies the [MIT-licensed Whisper Tiny model](https://huggingface.co/Systran/faster-whisper-tiny) by checksum, recognizes synthetic German and English speech, builds the Linux archive and tests the installed app in a Fedora 45 container with Xvfb and a virtual PulseAudio microphone. Run the equivalent checks locally with:
 
 ```bash
-PYTHONPATH=src xvfb-run -a python scripts/smoke-whisper.py
+PYTHONPATH=src xvfb-run -a python scripts/smoke-whisper.py /tmp/voicewright-test-model
 bash scripts/build-linux.sh
-xvfb-run -a bash scripts/smoke-linux.sh release/Voicewright-*-linux-x86_64.tar.gz
+xvfb-run -a bash scripts/smoke-linux.sh release/Voicewright-*-linux-x86_64.tar.gz /tmp/voicewright-test-model
 ```
 
 The target for this release is Fedora Linux x86_64. Windows and macOS packaging files are included for future work.

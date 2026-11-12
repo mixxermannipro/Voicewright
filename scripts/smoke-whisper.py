@@ -1,6 +1,8 @@
 """Check offline speech recognition and Qt clipboard output on synthetic audio."""
 import hashlib
 import os
+import shutil
+import sys
 import subprocess
 import tempfile
 import urllib.request
@@ -20,7 +22,22 @@ PHRASES = (
 )
 
 
-def main() -> None:
+def prepare_model(model: Path) -> None:
+    model.mkdir(parents=True, exist_ok=True)
+    for name, expected in CHECKSUMS.items():
+        target = model / name
+        if target.is_file():
+            payload = target.read_bytes()
+        else:
+            with urllib.request.urlopen(f"{BASE}/{name}?download=true", timeout=90) as response:
+                payload = response.read()
+        if hashlib.sha256(payload).hexdigest() != expected:
+            raise RuntimeError(f"Checksum mismatch for {name}")
+        if not target.is_file():
+            target.write_bytes(payload)
+
+
+def main(cache: Path) -> None:
     from faster_whisper.audio import decode_audio
     from PySide6.QtWidgets import QApplication
 
@@ -32,17 +49,8 @@ def main() -> None:
         directory = Path(scratch)
         os.environ["VOICEWRIGHT_DATA_DIR"] = scratch
         model = directory / "models" / "tiny"
-        model.mkdir(parents=True)
-        cache = os.environ.get("VOICEWRIGHT_TEST_MODEL")
-        for name, expected in CHECKSUMS.items():
-            if cache:
-                payload = (Path(cache) / name).read_bytes()
-            else:
-                with urllib.request.urlopen(f"{BASE}/{name}?download=true", timeout=90) as response:
-                    payload = response.read()
-            if hashlib.sha256(payload).hexdigest() != expected:
-                raise RuntimeError(f"Checksum mismatch for {name}")
-            (model / name).write_bytes(payload)
+        prepare_model(cache)
+        shutil.copytree(cache, model)
 
         app = QApplication([])
         config = Config(directory / "config.json")
@@ -64,4 +72,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    main(Path(sys.argv[1]))
