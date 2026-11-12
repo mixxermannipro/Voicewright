@@ -1,5 +1,41 @@
 # Arbeitsstand und Übergabe
 
+## Issue #76 – autonomes Modell-Gate (12. November 2026)
+
+Basis ist `main` nach PR #77 (`fcf9dae`); bestehende unveröffentlichte
+Fedora-/UI-Arbeiten im ursprünglichen Checkout wurden nicht verändert.
+Zwei DeepSeek-V4.1-Flash-Free-Analysen und ein unabhängiger Review lieferten
+das Inventar und die Fehlerprüfung. Draft #75 enthält nur eine Wayland-Probe,
+keinen fertigen produktiven Ausgabepfad; er wurde nicht übernommen.
+
+Der Rust-Pflichtjob führt jetzt die bislang ignorierten Whisper-/Qwen-Tests
+zusätzlich aus. `scripts/model_gate.py` prüft gepinnte Modellgröße/SHA256
+auch bei Cachetreffern, erzeugt synthetische DE/EN-WAVs und schreibt einen
+JSON-Bericht mit Commit, Runner, Workflow-URL, Hashes und Prozesslaufzeiten.
+Null ausgewählte Rust-Tests, Timeouts, beschädigte Modelle und frühe
+Skriptfehler sind keine erfolgreichen Modellprüfungen. CI lädt Berichte
+und Logs hoch, aber keine Gewichte oder Sprachdateien. Lizenzquellen wurden
+gegen Whisper-MIT und die gepinnte Qwen-Apache-2.0-Modellkarte geprüft.
+
+**Lokal geprüft:** Node 24.22.0 / Rust 1.99.1; `npm ci`, Typen, ESLint,
+12 Vitest-Tests, Frontend-Build und npm-Audit (0 Treffer). Beide Cargo-Projekte
+bestanden fmt, Clippy mit `--all-targets -- -D warnings` und Tests mit
+`--all-targets`. Die Standardläufe ignorieren weiterhin die separat
+ausgeführten Modelltests. 20 Python-Tests (13 Modell-Gate-, 7 Paketprüfertests)
+und actionlint 1.7.12 bestanden. Der erste echte Gate-Lauf bestand mit
+Whisper und Qwen; seine 99,6 Sekunden enthalten teilweise Kompilierung,
+keine reine Inferenzmessung. Ein zu kurz begrenzter erster Rust-Prüfaufruf
+wurde beim Cleanup-Bau nach 120 Sekunden abgebrochen; der ungekürzte
+Wiederholungslauf bestand. Kein Nutzergerät und kein Portal wurden geöffnet.
+
+**Offene P0-Grenzen:** Fensteridentität allein beweist kein unverändertes,
+nicht geschütztes Textfeld (`insertion.rs`); sichere Feldprüfung und negative
+GTK-Szenarien fehlen. Native Windows-/macOS-PR-Builds, Wayland-Permission-
+Simulationen, virtuelle Mikrofon-App-E2E, 100+-Zyklen-/Ressourcenprüfungen,
+die minimale Settings-Oberfläche und vollständig geprüfte Kandidatenpakete
+sind noch nicht als V1 nachgewiesen. Dieses Teil-Gate ist keine fertige V1,
+kein Release und kein Anlass für eine vorgezogene Nutzerabnahme.
+
 > **Historische Entwicklungsnachweise.** Seit **12.11.2026** ist nur noch [V1-Issue #76](https://github.com/mixxermannipro/Voicewright/issues/76) mit [V1_SCOPE.md](V1_SCOPE.md) und [VIRTUAL_TESTING.md](VIRTUAL_TESTING.md) der aktuelle Arbeitsauftrag. Die alten Issues #39/#47 und ihre manuellen Zwischenfreigaben wurden ersetzt. Alle während der Entwicklung erforderlichen Tests sollen **autonom virtuell** stattfinden; der Eigentümer testet den fertigen Kandidaten einmal ganz am Ende und gibt dann Feedback. Historische Tests und ältere Branch-Anweisungen unten sind nicht automatisch aktuelle Freigabenachweise.
 
 

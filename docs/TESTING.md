@@ -164,7 +164,36 @@ Desktop-Einfügung. Konkrete Ergebnisse und Einschränkungen stehen in
 [LOCAL_CLEANUP_EVALUATION.md](LOCAL_CLEANUP_EVALUATION.md), Bedienung und
 Ressourcengrenzen in [LOCAL_CLEANUP.md](LOCAL_CLEANUP.md).
 
-Diese Tests laufen getrennt von den Standardprüfungen. Verwende das
+### Autonomes CI-Modell-Gate / Autonomous CI model gate
+
+Der Rust-Job führt die beiden Modelltests zusätzlich zum Unit-Lauf verbindlich
+aus. Voraussetzung sind eSpeak NG, FFmpeg und curl sowie die normalen
+Rust-/Tauri-Baubibliotheken und das vorbereitete Sidecar:
+
+```sh
+python3 -m unittest discover -s scripts -p 'test_*.py'
+python3 scripts/model_gate.py --cache /tmp/opencode/voicewright-models \
+  --output /tmp/opencode/voicewright-model-evidence
+```
+
+Beim ersten Lauf werden rund 787 MB Kataloggewichte geladen. Cachedateien
+werden jedes Mal auf Größe und SHA256 geprüft, fehlerhafte Dateien nicht
+überschrieben oder verwendet. Im Fehlerfall den betreffenden **eigenen
+Testcache** untersuchen; keine privaten Modellordner als Cache verwenden.
+In CI sind Cache-Schlüssel unveränderlich. Bei beschädigtem CI-Cache den
+Versionszusatz `verified-models-v1` im Workflow erhöhen und neu prüfen; keine
+Hashprüfung deaktivieren. Nur die beiden fertigen Modell-Dateien werden gecached.
+Der JSON-Bericht und Prozesslogs bleiben unter `--output`. Synthetische WAVs
+werden in einem temporären Ordner erzeugt und danach entfernt. Die
+Lizenzquellen stehen in `scripts/model-gate-models.json` und [MODELS.md](MODELS.md).
+
+This gate uses real local CPU inference on synthetic DE/EN speech. It does
+not access a microphone, desktop or portal. Successful unit tests alone do
+not imply a successful model gate. Reports explicitly list untested paths;
+the current short smoke assertions are not accuracy or cleanup-quality
+benchmarks. eSpeak NG/FFmpeg are CI tools, not bundled with the app.
+
+Die folgenden Einzelbefehle laufen getrennt von den Standardprüfungen. Verwende das
 Whisper-Base- und das Qwen3-0.6B-Q8_0-Modell aus dem [Katalog](MODELS.md).
 Setze die beiden Modellpfade auf deine lokalen, geprüften Dateien.
 

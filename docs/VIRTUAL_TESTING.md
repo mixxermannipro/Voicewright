@@ -16,11 +16,17 @@
 
 ## Bestehender automatisierter Pfad (am Stichtag)
 
-- `.github/workflows/ci.yml`: Node 24 Webchecks, Rust 1.99.1 inklusive beiden Cargo-Projekten, Workflow-Lint und Linux-Paketjob. Sammelstatus `check`.
+- `.github/workflows/ci.yml`: Node 24 Webchecks, Rust 1.99.1 inklusive beiden Cargo-Projekten (`--all-targets`), Workflow-Lint und Linux-Paketjob. Sammelstatus `check`. Der Rust-Job führt zusätzlich die explizit ausgewählten echten Whisper-/Qwen-Integrationstests aus; ihr Fehler blockiert `check`.
 - `.github/workflows/linux-package.yml`: auf Ubuntu 22.04 AppImage+DEB bauen, ABI/Contents/Checksummen prüfen. Derzeit keine vollständige synthetische Mikrofon-E2E in CI.
 - `scripts/linux-smoke/x11-insertion.sh`: isolierter Xvfb + echter GTK-TextView/Insertion-Adapter, Unicode/Emoji/Absatz. In CI als separaten verpflichtenden, nicht bloß dokumentierten Test integrieren.
 - `scripts/linux-smoke/run.sh`: AppImage/DEB + pulseaudio `module-pipe-source` + synthetische PCM-Datei + `xdotool` + GTK. Modelle/Audiodateien sind vorausgesetzt und **dürfen nicht** aus persönlichen Quellen kopiert werden.
-- Modelltests `src-tauri/tests/speech.rs` und `engines/cleanup/tests/protocol.rs` wurden vor PR #75 in normalen Läufen teilweise ignoriert. In einem **separaten testbaren Runner-Gate** rechtmäßige Modellgewichte mit SHA256 und geklärter Lizenz herunterladen/importieren und gezielt ausführen; Mocks dürfen keine ASR-Leistung vortäuschen.
+- Modelltests `src-tauri/tests/speech.rs` und `engines/cleanup/tests/protocol.rs` bleiben im normalen Offline-Unit-Lauf ignoriert. `scripts/model_gate.py` führt beide gezielt mit echten CPU-Engines und synthetischen DE/EN-WAVs aus. Gewichte sind in `scripts/model-gate-models.json` nach Quelle, Commit, Größe, SHA256 und Lizenz festgeschrieben; jeder Cachetreffer wird erneut geprüft. Ein erfolgreicher Cargo-Aufruf mit null ausgewählten Tests gilt als Fehler.
+
+### Maschinenbericht des Modell-Gates / Model-gate evidence
+
+Das CI-Artefakt `model-evidence-<OS>-<ARCH>-<SHA>` enthält `report.json` und Prozesslogs, keine Gewichte oder WAV-Dateien. Der Bericht nennt Commit, Workflow-URL, Runner, Modell-/Fixture-Hashes, Lizenzquellen, Ergebnis, Zeitlimit und gemessene Prozesslaufzeit. Fehlerberichte werden ebenfalls hochgeladen, wenn das Gate gestartet ist; ein vorheriger Build-/Setupfehler kann noch keinen Modellbericht erzeugen und bleibt ein roter CI-Job.
+
+The artifact records real CPU-model integration, not microphone capture or desktop E2E. Timings include Cargo/test startup and are not inference-only latency. Fixture hashes identify the actual eSpeak/FFmpeg output on that runner; they need not match across tool versions. Tool-version logs are included. The small substring smoke assertions are not a WER/CER benchmark or proof of general cleanup quality. Virtual microphone, noise/long-audio, resource/stress, insertion and OS-permission coverage remain separate gates.
 
 ## V1-Automatisierungsaufträge
 
