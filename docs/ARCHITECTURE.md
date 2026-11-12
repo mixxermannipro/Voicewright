@@ -1,5 +1,8 @@
 # Architektur
 
+> **V1-Architekturgrenze seit 12.11.2026:** [Issue #76](https://github.com/mixxermannipro/Voicewright/issues/76) und [V1_SCOPE.md](V1_SCOPE.md) priorisieren ein sicheres lokal-first Produkt. [VIRTUAL_TESTING.md](VIRTUAL_TESTING.md) verlangt autonome Test-Doubles für Mikrofon-/Portal-/Fokuszustände und einen echten isolierten X11-Adaptertest. Keine Rechteumgehung oder vorgetäuschte Wayland-/macOS-Einfügefähigkeit. Die persönliche Praxisabnahme findet erst nach einem fertigen CI-geprüften Testkandidaten statt.
+
+
 Voicewright ist eine eigenständige Anwendung im Repository `mixxermannipro/Voicewright`. Der Produktname wurde mit dem Repository-Namen vereinheitlicht. Eine belastbare Marken- und Namensprüfung steht noch aus und gehört zu Issue #28.
 
 ## Technische Entscheidungen

@@ -1,5 +1,10 @@
 # Testanleitung
 
+> **Neuer V1-Testprozess seit 12.11.2026:** Bis zum fertig gebauten Testkandidaten **keine persönlichen Geräte- oder Betriebssystemfreigaben** anfordern. Virtuelle Windows-/macOS-/Linux-Runner, Xvfb, synthetische Audioeingaben, D-Bus-/Permission-Mocks und Paketprüfungen verwenden. [VIRTUAL_TESTING.md](VIRTUAL_TESTING.md) und [V1_SCOPE.md](V1_SCOPE.md) sind verbindlich. Historische nachstehende Anleitungen für **manuelle** Freigaben/physische Geräte dienen nur der **abschließenden Nutzerfeedbackrunde**, nicht als Zwischen-Releaseblocker für den CI-geprüften Kandidaten. Die öffentliche Stable-Freigabe kommt erst **nach** diesem Feedback. Eine simulierte Freigabe zählt nie als echte OS-Freigabe.
+
+**In der CI verpflichtend:** Linux-X11-Eingabe über `scripts/linux-smoke/x11-insertion.sh` (privates Xvfb, echtes GTK-Feld) ergänzt die Unit-Tests. **Nicht** auf Nutzersystemen ausführen. Modelltests mit echten, lizenzierten Gewichten bleiben als zusätzliche automatische CI-Ausbaustufe offen, soweit noch nicht aktiv.
+
+
 Die konkreten Ergebnisse stehen in [PROGRESS.md](PROGRESS.md). Führe nach
 den [Installationsschritten](INSTALLATION.md) diese Prüfungen aus:
 

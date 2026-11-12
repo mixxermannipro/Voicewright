@@ -1,96 +1,61 @@
-# Voicewright
+# Voicewright – Regeln für Coding-Agenten
 
-Desktop-App für lokales Diktat (Tauri 2, React, TypeScript; Rust steuert
-Aufnahme, Erkennung und Einfügen). Die Oberfläche ist zweisprachig (DE/EN).
-Cloud-Dienste laufen nur mit ausdrücklicher eigener Konfiguration.
+## Einziger aktueller Auftrag
 
-## Struktur
+**[Issue #76: funktionierende Voicewright V1 mit autonomer virtueller Vorprüfung](https://github.com/mixxermannipro/Voicewright/issues/76).**
+Lies [docs/V1_SCOPE.md](docs/V1_SCOPE.md), [docs/VIRTUAL_TESTING.md](docs/VIRTUAL_TESTING.md), [docs/REPOSITORY_MAP.md](docs/REPOSITORY_MAP.md), dann die betroffenen Komponenten. Die früheren 35 offenen Tickets sind in [docs/ISSUE_TRIAGE.md](docs/ISSUE_TRIAGE.md) dokumentiert und archiviert. Die alten Masterpläne #39/#47 gelten **nicht** mehr als Arbeitsreihenfolge.
 
-- `src/` — Oberfläche und TypeScript-Tests (Vitest).
-- `src-tauri/` — Hauptprozess (Rust). `src-tauri/binaries/` hält das
-  Engine-Binary, gitignored.
-- `engines/cleanup/` — lokale Textkorrektur als separates Programm
-  (llama.cpp-Sidecar). **Kein Workspace-Mitglied** von `src-tauri`: zwei
-  unabhängige Cargo-Projekte mit eigenen `Cargo.lock`. Jeder cargo-Befehl
-  braucht `--manifest-path <pfad> --locked`; `cargo` im Repo-Root funktioniert
-  nicht.
-- `docs/TESTING.md` — vollständige Prüfliste. `docs/PROGRESS.md` — aktueller
-  Stand, bei Änderungen aktualisieren.
+**Keine Feature-Flut:** Eine stabile Hintergrund-Diktier-App mit lokaler DE/EN-Whisper-Erkennung, Hotkey/Tray, sicherer Textausgabe/Copy-Fallback, Modellverwaltung und ruhigen DE/EN-Einstellungen. UI nach [festgelegten Mockups](docs/design/VOICEWRIGHT_UI_CONCEPT.md) (General, Dictation, Models, Shortcuts, Privacy). Keine neue umfangreiche KI-, Provider- oder Theme-Initiative vor V1.
 
-## Befehle
+## Verbotene Blocker während der Entwicklungsphase
 
-Toolchain: Node 24 und Rust 1.99.1 (CI-Pins), dazu CMake und Clang/libclang —
-die Korrektur kompiliert llama.cpp aus dem Quellcode, der erste Build dauert
-lange.
+- **Nicht** den Eigentümer um Zugriff auf persönliche Mikrofone, Bildschirmfreigaben, Wayland-Portale, Apple Accessibility, Windows-UI, Testgeräte oder lokale Testausführung bitten.
+- Alle Entwicklungs- und Funktionstests in **GitHub CI, VMs, Containern, Xvfb/virtuellem Compositor und synthetischer Audio-/Eingabeumgebung** automatisieren, mit korrekten CI-Nachweisen.
+- Ein realer OS-Permissiondialog darf weder umgangen noch als automatisch genehmigt vorgetäuscht werden. Stattdessen `granted/denied/revoked/timeout/unavailable` isoliert simulieren; sicherer Copy-Fallback.
+- Wenn Signatur-/Notarisierungsdaten oder Cloud-Keys nicht bereitstehen: keine persönlichen Geheimnisse anfordern, **unsignierten Testkandidaten** mit klarer Kennzeichnung vorbereiten. Kein öffentliches Stable-Release.
+- **Nur am Ende:** Eigentümer installiert einen virtuell geprüften Kandidaten und liefert „funktioniert / funktioniert nicht“-Feedback. Negative Fälle als automatisierte Regressionen ergänzen, PRs erstellen, erneut prüfen. Vor seiner abschließenden Zustimmung kein öffentlicher Stable-Tag.
 
-```sh
+## Architektur
+
+- `src/` = React/TypeScript UI und Vitest.
+- `src-tauri/src/` = Rust: Audio/ASR/Session/Hotkeys/Insertion, Betriebssystemintegration.
+- `engines/cleanup/` = eigenständiges Rust-Projekt, llama.cpp-Sidecar, **kein Cargo-Workspace** mit `src-tauri`. Beide mit `--manifest-path` und `--locked` testen.
+- `src-tauri/binaries/` ist generiert/ignoriert, nach `npm run prepare:engine` bereit; keine Modellgewichte oder privaten Samples in Git.
+- `scripts/linux-smoke/` = echte automatisierbare Testkette mit Xvfb, GTK, virtueller Audioquelle; `.github/workflows/ci.yml` hat den Pflichtcheck **`check`**, nicht `Build`. Weitere aktive Workflows unter `.github/workflows/`.
+- Aktuelle Version `0.1.0-alpha.1` (Node/Tauri/Cargo synchron). `de.voicewright.desktop` ist migrationsrelevant, historische Podman-Image-Namen `voxtakt` nicht blind umbenennen.
+
+## Toolchain und lokale/virtuelle Gates
+
+**Node 24, Rust 1.99.1**, CMake, Clang/libclang, Tauri-Plattformbibliotheken. Vor Tauri-Build `npm run prepare:engine`.
+
+```bash
 npm ci
-npm run prepare:engine   # baut engines/cleanup, kopiert nach src-tauri/binaries/
-npm run tauri -- dev     # oder: npm run tauri -- build
-```
-
-Ohne `prepare:engine` schlagen `tauri dev` und `tauri build` fehl
-(Tauri `externalBin`). Das Skript nimmt optional einen Target-Triplet an:
-`npm run prepare:engine -- x86_64-unknown-linux-gnu`.
-
-Alle Prüfungen in CI-Reihenfolge (auch in docs/TESTING.md):
-
-```sh
 npm run check && npm run lint && npm test && npm run build
 cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
 cargo fmt --manifest-path engines/cleanup/Cargo.toml --all -- --check
 cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings
-cargo test --manifest-path src-tauri/Cargo.toml --locked
 cargo clippy --manifest-path engines/cleanup/Cargo.toml --locked --all-targets -- -D warnings
-cargo test --manifest-path engines/cleanup/Cargo.toml --locked
+cargo test --manifest-path src-tauri/Cargo.toml --locked --all-targets
+cargo test --manifest-path engines/cleanup/Cargo.toml --locked --all-targets
 npm audit --audit-level=high
+git diff --check
 ```
 
-Einzeltests:
+Echte Modellintegration **mit synthetischen** DE/EN-Files und verifizierten Gewichten separat im virtuellen CI-Gate ausführen. Ignore-/Mock-Tests nie als echte Whisper/Audio-End-to-End-Prüfung bezeichnen. Paket- und GUI-Smokes eigenständig automatisieren; keine Desktop-Freigabe des Eigentümers. Ungetestete Grenzen im Bericht kennzeichnen. `docs/TESTING.md` und `docs/VIRTUAL_TESTING.md` beachten.
 
-- TypeScript: `npm test -- src/domain.test.ts` (Datei) oder
-  `npm test -- -t "Testname"`.
-- Rust: `cargo test --manifest-path <pfad> --locked <Testname>`.
+## Workflow mit autonomen PRs
 
-## Tests
+1. Aktuelles `main` lesen, nur für die kleinste V1-Teilaufgabe frischen `feature/*`-/`fix/*`-/`chore/*`-Branch anlegen. Keine direkten main-Commits, keine Force-Pushes, keine fremden PR-Branches überschreiben.
+2. Neue Tests vor/mit Fix, bekannte Lücken erfassen, vollständige lokale Tests wo verfügbar und virtuelle CI laufen lassen. Falls ein Test mangels Runner/OS-Lizenz nicht möglich ist: nicht „grün“ melden, sondern als reales Rest-Risiko dokumentieren.
+3. PR gegen `main` mit `Part of #76`, Messungen/Log-Links/Artefakten, Feature-Freeze-, Sicherheits-/Lizenz- und Konfliktprüfung. **Nicht** `Closes #76` schreiben.
+4. Vor Merge: Diff/reale Changes überprüfen, `main` auf neue Commits prüfen, Konflikte korrekt lösen, Pflichtcheck **`check`** muss erfolgreich sein. Fertige kleine PRs können nach bestandenen Checks autonom gesquasht werden; **Drafts oder ungeprüfte Sicherheitsänderungen niemals**. Kein Bypass von Branch-Schutz.
+5. Nach Merge nur belegte Kriterien in #76 abhaken. Dokumentation, [PLATFORM_SUPPORT.md](docs/PLATFORM_SUPPORT.md), [TESTING.md](docs/TESTING.md) und historische [PROGRESS.md](docs/PROGRESS.md) sorgfältig aktuell halten.
 
-- `src-tauri/tests/speech.rs` und `engines/cleanup/tests/protocol.rs` sind
-  `#[ignore]`: Sie brauchen echte Modellgewichte
-  (`VOICEWRIGHT_WHISPER_MODEL` bzw. `VOICEWRIGHT_TEST_GGUF`) und WAV-Fixtures
-  aus espeak-ng plus ffmpeg. Setup steht in docs/TESTING.md. Das normale
-  `cargo test` läuft ohne sie.
-- Sidecar-Protokoll: JSON über stdin/stdout zwischen App und
-  `voicewright-cleanup` (`engines/cleanup`), maximal 256 KB pro Request. Zur
-  Laufzeit liegt das Binary neben der Haupt-EXE; Tauri kopiert es im Dev-Modus
-  aus `src-tauri/binaries/`.
-- `scripts/linux-smoke/run.sh` (DEB, Xvfb, künstliche Mikrofoneingabe) läuft
-  nur in einem isolierten Linux-Container ohne Netzwerk; Details in
-  docs/TESTING.md.
+## Datenschutz/Sicherheit
 
-## Fallback ohne Rust-Toolchain
+- Keine echten Transkripte, Audios, Passwörter oder API-Keys in Tests, Logs oder Git. Nur synthetische freie Fixtures.
+- OS-Keyring für Keys, Cloud nur bei Opt-in; keine heimliche Übertragung. Fremdcode-/Modell-/Binary-Lizenzen und Hashes/NOTICE prüfen.
+- Keine Blind-Insertion bei gewechseltem Fokus, sicherem Feld oder verweigertem Portal; Text im Recovery erhalten. Keine Root-/uinput-/Permission-Umgehung.
+- Große Daten-/Modell-/ABI-/Rechtslücken nicht zu kosmetischen Tests herunterstufen. Ein grüner Mock-Build ist kein Nachweis für eine freigegebene physische Installation.
 
-Ohne lokale Rust-Toolchain mit Systembibliotheken laufen die Rust-Prüfungen in
-den lokal gebauten Podman-Images: `localhost/voxtakt-build:latest` für
-Build/Prüfungen und `localhost/voxtakt-smoke` für den DEB-Smoke. Die
-`voxtakt`-Namen sind **keine Tippfehler** — das Projekt heißt früher so und
-wurde zu Voicewright umbenannt; die Namen nicht „korrigieren“.
-
-```sh
-podman run --rm -v "$PWD":/work:Z -w /work localhost/voxtakt-build:latest
-# im Container: export PATH=/usr/local/cargo/bin:$PATH
-# für engines/cleanup: CARGO_TARGET_DIR=/work/target setzen
-```
-
-## Regeln
-
-- Zweisprachig: sichtbare Texte immer in Deutsch und Englisch aktualisieren.
-- API-Schlüssel nur im System-Schlüsselspeicher; der Einstellungen-Export
-  enthält bewusst keine Schlüssel.
-- Modelle, Rohaufnahmen, private Diktate, `src-tauri/binaries/` und `target/`
-  bleiben außerhalb von Git.
-- Eigener Zweig von `main`; lokale Prüfungen vor dem Push; Pull Requests nie
-  selbst mergen.
-- Gesprochene Diktatbefehle lösen niemals OS-Aktionen aus (Parser ist
-  Text-only, opt-in, standardmäßig aus); siehe docs/SPOKEN_FORMATTING.md.
-- Ungeprüfte Plattformfunktionen ausdrücklich kennzeichnen.
-- Veröffentlichungen laufen über den Ablauf in docs/RELEASE.md.
+**V1-Kandidat ≠ öffentliche Freigabe.** Owner prüft einmal am Ende praktisch und gibt gezieltes Feedback, das danach abgearbeitet wird.

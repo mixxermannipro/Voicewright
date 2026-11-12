@@ -1,5 +1,8 @@
 # Beitragen
 
+> **Aktueller Entwicklungsmodus (12.11.2026):** ausschließlich [V1-Issue #76](https://github.com/mixxermannipro/Voicewright/issues/76), [V1_SCOPE.md](docs/V1_SCOPE.md) und [VIRTUAL_TESTING.md](docs/VIRTUAL_TESTING.md) beachten. Funktionstests bis zur V1-Kandidatenübergabe vollständig auf CI/virtuellen Runnern mit synthetischen Eingaben durchführen; keine Besitzerfreigaben oder physischen Geräte verlangen. Manuelle Praxistests und Feedback gibt der Eigentümer **erst am Schluss**. Teil-PRs mit `Part of #76` verknüpfen, keine vorzeitige Schließung.
+
+
 Lege für deine Änderung einen eigenen Zweig auf Basis von `main` an.
 Beschreibe im Pull Request (Änderungsvorschlag auf GitHub), welchen Ablauf
 du geändert hast. Nenne Betriebssystem, Tests und offene Prüfungen.
