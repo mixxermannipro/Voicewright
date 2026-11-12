@@ -17,6 +17,9 @@ jobs:
   linux-package:
     uses: ./.github/workflows/linux-package.yml
 
+  native-package:
+    uses: ./.github/workflows/native-package.yml
+
   web:
     runs-on: ubuntu-24.04
     timeout-minutes: 40
@@ -130,7 +133,7 @@ jobs:
   check:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [web, rust, workflows, linux-package]
+    needs: [web, rust, workflows, linux-package, native-package]
     if: always()
     steps:
       - name: Fail unless every needed job succeeded

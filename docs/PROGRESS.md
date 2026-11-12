@@ -1,5 +1,23 @@
 # Arbeitsstand und Übergabe
 
+## Issue #76 – native CI-Matrix in Vorbereitung (12. November 2026)
+
+Der nächste kleine Zweig baut auf dem getrennten Textfeld-PR #79 auf:
+Windows 2022 x64 und macOS 15 ARM64 sollen beide Cargo-Projekte mit
+fmt/Clippy/`--all-targets` testen und NSIS/DMG als unveröffentlichte Artefakte
+bauen. Der neue Prüfer untersucht den **Installerinhalt**, nicht nur vorhandene
+Dateinamen: Hauptprogramm und Sidecar müssen die Zielarchitektur haben,
+Lizenzhinweise und Versionsgleichheit werden geprüft, SHA256 und beobachteter
+Signaturstatus dokumentiert. Ein jobweiter Fehlerbericht ergänzt Paketberichte;
+der Tag-Workflow soll dieselben CI-Artefakte wiederverwenden, nicht neu bauen.
+
+**Bisher nur lokal belegt:** 17 Vitest-Tests (davon 5 neue synthetische
+PE-/Mach-O-/Payload-/Versions-/Fehlerberichttests), Typen, ESLint, Web-Build
+und actionlint. Das ist noch **kein** nativer Windows-/macOS-Erfolg. Keine
+Signaturdaten, kein Tag, keine Veröffentlichung. Der zusätzliche kostenlose
+DeepSeek-Review scheiterte am Nutzungslimit; kein bezahltes Ersatzmodell,
+für diesen neuen Paketprüfer zunächst Selbstprüfung und reale CI vorgesehen.
+
 ## Issue #76 – feldgebundene X11-Ausgabe (12. November 2026)
 
 Eigener Zweig von `fcf9dae`, unabhängig von Modell-PR #78. Die alte

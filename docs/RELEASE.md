@@ -29,8 +29,11 @@ der Versionsnummer.
    den Quellstand und baut NSIS-EXE, DMG, AppImage und DEB auf getrennten
    Rechnern. Erst nach allen erfolgreichen Builds und Prüfungen veröffentlicht
    er die vier Dateien und ihre SHA-256-Prüfsummen.
-   Linux wird bereits im wiederverwendeten CI-Check auf Ubuntu 22.04 gebaut
-   und vor dem Upload geprüft; der Releasejob verwendet genau dieses Artefakt.
+    Alle vier Pakete werden bereits im wiederverwendeten CI-Check gebaut:
+    Linux auf Ubuntu 22.04, Windows x64 auf Windows 2022, macOS ARM64 auf
+    macOS 15. Der Releasejob verwendet genau diese geprüften Artefakte, keinen
+    zweiten Build. In PRs werden sie nur als zeitlich begrenzte Testartefakte
+    hochgeladen; dabei wird weder ein Tag noch eine GitHub-Veröffentlichung erstellt.
    Das [Linux-Testprotokoll](LINUX_RELEASE_TESTS.md) trennt Paketprüfungen von
    noch ausstehenden echten Desktop-/Update-Tests.
 4. Öffne die Vorabversion auf GitHub. Vergleiche die Paketliste und prüfe
@@ -38,6 +41,17 @@ der Versionsnummer.
    Quellstand und die Ergebnisse der Installationsprüfungen im Projektstand.
 
 ## Signaturen
+
+Der native Paketbericht `report.json` protokolliert beobachtete
+Authenticode-/Codesign-Zustände. Eine Ad-hoc-Signatur ist kein
+Herstellerzertifikat und keine Notarisierung. Native Struktur-/Architekturtests
+sind keine praktische Installer-/Gatekeeper-/SmartScreen-Abnahme.
+
+**English:** PR CI builds unpublished native test artifacts, checks main/sidecar
+architecture and bundled notices, and records SHA256 and observed signature
+status. Release publication reuses those exact gated artifacts only after an
+explicitly authorized tag. CI does not prove OS consent, installer upgrades,
+trusted signing or real-device behavior.
 
 Die Pakete werden ohne Herstellerzertifikate gebaut. Windows kann eine
 SmartScreen-Warnung anzeigen. macOS kann beim Öffnen aus dem Internet eine

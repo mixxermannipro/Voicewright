@@ -52,93 +52,10 @@ jobs:
     needs: version
     uses: ./.github/workflows/ci.yml
 
-  package:
-    needs: checks
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 60
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: windows-2022
-            target: x86_64-pc-windows-msvc
-            bundles: nsis
-          - runner: macos-15
-            target: aarch64-apple-darwin
-            bundles: dmg
-    env:
-      RUSTUP_TOOLCHAIN: '1.99.1'
-      RUST_TARGET: ${{ matrix.target }}
-      BUNDLES: ${{ matrix.bundles }}
-      APPIMAGE_EXTRACT_AND_RUN: '1'
-    steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          persist-credentials: false
-
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with:
-          node-version: '24'
-          cache: npm
-
-      - name: Install Linux build dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends -y build-essential cmake clang libclang-dev \
-            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev \
-            libasound2-dev libdbus-1-dev libx11-dev libxdo-dev patchelf
-
-      - name: Add the Rust build target
-        shell: bash
-        run: |
-          rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --target "$RUST_TARGET"
-          rustc --version
-
-      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            engines/cleanup/target
-          key: release-rust-${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('rust-toolchain.toml', '**/Cargo.lock', '.github/workflows/release.yml') }}
-
-      - name: Build installers
-        shell: bash
-        run: |
-          npm ci
-          npm run prepare:engine -- "$RUST_TARGET"
-          npm exec -- tauri build --ci --target "$RUST_TARGET" --bundles "$BUNDLES" -- --locked
-
-      - name: Collect the requested installers
-        shell: bash
-        run: |
-          shopt -s nullglob
-          mkdir dist-release
-          bundle_dir="src-tauri/target/$RUST_TARGET/release/bundle"
-          case "$RUST_TARGET" in
-            x86_64-pc-windows-msvc)
-              installers=("$bundle_dir"/nsis/*.exe)
-              test "${#installers[@]}" -eq 1 || exit 1
-              cp -- "${installers[@]}" dist-release/
-              ;;
-            aarch64-apple-darwin)
-              dmgs=("$bundle_dir"/dmg/*.dmg)
-              test "${#dmgs[@]}" -eq 1 || exit 1
-              cp -- "${dmgs[@]}" dist-release/
-              ;;
-            *) exit 1 ;;
-          esac
-
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        with:
-          name: packages-${{ matrix.target }}
-          path: dist-release/
-          if-no-files-found: error
-          retention-days: 7
-
   publish:
-    needs: package
+    # CI already built and validated Linux, Windows and macOS packages. Reuse
+    # those exact artifacts; never rebuild different binaries after the gate.
+    needs: checks
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
