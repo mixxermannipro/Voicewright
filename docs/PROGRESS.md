@@ -1,5 +1,11 @@
 # Arbeitsstand und Übergabe
 
+> **Aktueller Stand:** Der Umbau auf Voicewright 2.0 läuft auf dem Branch
+> `feat/v2-dictation-suite`. Was fertig, was in Arbeit und was offen ist,
+> steht laufend aktualisiert in [V2_STATUS.md](V2_STATUS.md). Alles unterhalb
+> dieses Hinweises beschreibt die abgeschlossene Version 1 und bleibt als
+> Nachweis erhalten.
+
 > **Historische Entwicklungsnachweise.** Seit **12.11.2026** ist nur noch [V1-Issue #76](https://github.com/mixxermannipro/Voicewright/issues/76) mit [V1_SCOPE.md](V1_SCOPE.md) und [VIRTUAL_TESTING.md](VIRTUAL_TESTING.md) der aktuelle Arbeitsauftrag. Die alten Issues #39/#47 und ihre manuellen Zwischenfreigaben wurden ersetzt. Alle während der Entwicklung erforderlichen Tests sollen **autonom virtuell** stattfinden; der Eigentümer testet den fertigen Kandidaten einmal ganz am Ende und gibt dann Feedback. Historische Tests und ältere Branch-Anweisungen unten sind nicht automatisch aktuelle Freigabenachweise.
 
 ## Lokaler Fedora-Kandidat am 12. November 2026

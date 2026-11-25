@@ -1,8 +1,16 @@
 # Voicewright
 
-Voicewright ist eine Diktier-App für Fedora Linux (x86_64). Nach dem Herunterladen eines Whisper-Sprachmodells läuft die Spracherkennung lokal. Voicewright kopiert das fertige Diktat in die Zwischenablage.
+Voicewright ist eine lokale Diktier-App (Version 2.0) für Fedora Linux (x86_64) mit Unterstützung für Windows und macOS im Quellcode. Spracherkennung und regelbasierte Textbereinigung laufen lokal ohne Konto oder Cloud-Pflicht.
 
 [Zur englischen Anleitung / English instructions](#english)
+
+## Überblick (Version 2.0)
+
+- **Hybrid-Bedienung:** Ein Tastenkürzel (Standard `Ctrl+Shift+Leertaste`) für beide Gesten — kurz tippen schaltet die Aufnahme um, gedrückt halten spricht nur währenddessen, `Esc` bricht ab.
+- **Lokale Spracherkennung:** Parakeet TDT 0.6B v3 und SenseVoice über `sherpa-onnx` (optionales Extra `asr`) sowie Whisper (Tiny bis Large v3) über `faster-whisper`. Alle Modelle sind per Größe und SHA-256 geprüft.
+- **Lokale & optionale Textbereinigung:** Gesprochene Satzzeichen, Textbausteine, Wortersetzungen und Offline-Regeln laufen sofort und ohne KI. Optional lässt sich ein lokales Sprachmodell (Qwen3 über `llama.cpp`, Ollama oder LM Studio) oder ein Cloud-Anbieter mit eigenem API-Schlüssel aktivieren. Eine Schutzprüfung bewahrt Zahlen, Links, E-Mails, Code, Wörterbuch-Einträge und Verneinungen.
+- **Direktes Einfügen:** Unter Wayland über das offizielle Desktop-Portal (`GlobalShortcuts` / `RemoteDesktop` nach ausdrücklicher Freigabe), alternativ über `wtype`, opt-in `ydotool` oder die Zwischenablage. Unter X11 per XTEST/`xdotool`, unter Windows per `SendInput` und unter macOS per `CGEvent`.
+- **Datenschutz:** Cloud-Bereinigung und Diktat-Verlauf sind standardmäßig aus. API-Schlüssel speichert Voicewright ausschließlich im System-Schlüsselbund.
 
 ## Fedora installieren
 
@@ -16,32 +24,32 @@ sudo dnf install python3.11 python3.11-devel gcc kernel-headers portaudio xcb-ut
 2. Prüfe im Download-Ordner das Paket und entpacke es in einen leeren Ordner. Ersetze gegebenenfalls die Versionsnummer.
 
    ```bash
-   sha256sum -c Voicewright-1.0.0-linux-x86_64.tar.gz.sha256
+   sha256sum -c Voicewright-2.0.0-linux-x86_64.tar.gz.sha256
    mkdir voicewright-install
-   tar -xzf Voicewright-1.0.0-linux-x86_64.tar.gz -C voicewright-install
+   tar -xzf Voicewright-2.0.0-linux-x86_64.tar.gz -C voicewright-install
    bash voicewright-install/Voicewright/install.sh
    ```
-3. Starte **Voicewright** im Anwendungsmenü und lade unter **Sprachmodell** ein Modell. Beginne mit **Small** für Deutsch und Englisch oder **Tiny** für einen schnellen ersten Test.
+3. Starte **Voicewright** im Anwendungsmenü und lade unter **Modelle** ein Sprachmodell (z. B. **Parakeet V3** bei installiertem `asr`-Extra oder **Whisper Small** / **Whisper Tiny**).
 
-Der Installer lädt Python-Abhängigkeiten von PyPI und richtet Voicewright nur für dein Benutzerkonto ein. Für den Start unter Wayland verwendet das Paket XWayland, sofern es läuft. Für XWayland heißt das Paket `xorg-x11-server-Xwayland`.
+Der Installer lädt Python-Abhängigkeiten von PyPI und richtet Voicewright nur für dein Benutzerkonto ein. Für XWayland heißt das Paket `xorg-x11-server-Xwayland`.
 
 ## Diktieren
 
-Starte und stoppe mit der Schaltfläche in den Einstellungen. Unter KDE oder GNOME mit Wayland kannst du für denselben Vorgang in den Systemeinstellungen ein eigenes Tastenkürzel anlegen. Verwende als Befehl den vollständigen Pfad zu `~/.local/bin/voicewright` gefolgt von ` --toggle`. Unter X11 ist standardmäßig `Ctrl+Shift+Leertaste` eingerichtet. Füge den Text danach mit `Ctrl+V` ein.
-
-Externe Textkorrektur und lokaler Verlauf sind bei einer frischen Installation ausgeschaltet. Aktivierst du einen Cloud-Dienst, erhält dieser den erkannten Text. API-Schlüssel speichert Voicewright im System-Schlüsselbund.
+- **Tastenkürzel:** Im Hybrid-Modus startet ein Druck sofort die Aufnahme; kurzes Loslassen hält sie aktiv bis zum nächsten Druck, langes Halten beendet beim Loslassen. `Esc` verwirft die Aufnahme.
+- **Wayland:** Beim Start bittet Voicewright optional über das Desktop-Portal um Freigabe für globale Kürzel und Einfügen. Alternativ kannst du in GNOME oder KDE einen System-Kurzbefehl für `~/.local/bin/voicewright --toggle` anlegen. Ohne Freigabe oder Helfer bleibt der fertige Text sicher in der Zwischenablage (`Ctrl+V`).
+- **Auswahl umschreiben:** `voicewright --transform` kopiert die aktuelle Auswahl (nur wenn sich die Zwischenablage ändert), bereinigt sie und fügt sie wieder ein.
 
 ## English
 
-Download the Linux x86_64 archive and its checksum from [GitHub Releases](https://github.com/mixxermannipro/Voicewright/releases). Verify it with `sha256sum -c`, extract it into an empty directory, then run `bash Voicewright/install.sh` from that directory. Launch **Voicewright** and download a speech model. **Small** works for German and English. **Tiny** is useful for a quick test.
+Voicewright 2.0 is a local-first dictation application targeting Fedora Linux (`x86_64`), with Windows and macOS code paths included (not executed in CI). Speech recognition runs locally using `faster-whisper` (Whisper models) and optionally `sherpa-onnx` (Parakeet TDT 0.6B v3, SenseVoice).
 
-Start and stop recording using the button in Settings. On Wayland, set a custom GNOME or KDE shortcut to the full path of `~/.local/bin/voicewright` followed by ` --toggle`. On X11 the default shortcut is `Ctrl+Shift+Space`. Paste the finished text with `Ctrl+V`.
+Download the Linux `x86_64` archive and its checksum from [GitHub Releases](https://github.com/mixxermannipro/Voicewright/releases), verify it with `sha256sum -c`, extract it into an empty directory, and run `bash Voicewright/install.sh`. Launch **Voicewright** and download a speech model in **Models**.
 
-Install the Fedora prerequisites shown above. The installer fetches Python dependencies from PyPI and installs Voicewright for the current user. The app uses XWayland when available. Cloud cleanup and local history are off by default. Enabling cloud cleanup sends recognized text to the chosen provider. Keys are stored in the system keyring.
+Use one shortcut (`Ctrl+Shift+Space` by default) in **Hybrid** mode: tap to toggle recording on/off, hold to talk until release, or press `Esc` to cancel. On Wayland, Voicewright uses the official `GlobalShortcuts` and `RemoteDesktop` desktop portals after explicit consent, falling back to `wtype`, opt-in `ydotool`, a desktop shortcut (`voicewright --toggle`), or the clipboard. Cloud cleanup and local history are off by default; API keys are stored only in the system keyring.
 
 ## Entwicklung / Development
 
-Use Python 3.11 in an isolated environment. Install `requirements-dev.txt` and run `python -m pytest -q`. The `check` workflow also verifies the [MIT-licensed Whisper Tiny model](https://huggingface.co/Systran/faster-whisper-tiny) by checksum, recognizes synthetic German and English speech, builds the Linux archive and tests the installed app in a Fedora 45 container with Xvfb and a virtual PulseAudio microphone. Run the equivalent checks locally with:
+Use Python 3.11+ in an isolated environment. Install `requirements-dev.txt` (and optionally `pip install -e ".[asr,x11]"`) and run `python -m pytest -q`. The `check` workflow verifies the [MIT-licensed Whisper Tiny model](https://huggingface.co/Systran/faster-whisper-tiny) by checksum, recognizes synthetic German and English speech, builds the Linux archive and tests the installed app in a Fedora 45 container with Xvfb and a virtual PulseAudio microphone. Run the equivalent checks locally with:
 
 ```bash
 PYTHONPATH=src xvfb-run -a python scripts/smoke-whisper.py /tmp/voicewright-test-model
@@ -49,4 +57,4 @@ bash scripts/build-linux.sh
 xvfb-run -a bash scripts/smoke-linux.sh release/Voicewright-*-linux-x86_64.tar.gz /tmp/voicewright-test-model
 ```
 
-The target for this release is Fedora Linux x86_64. Windows and macOS packaging files are included for future work.
+**Plattformabdeckung / Platform coverage:** Linux Fedora (`x86_64`) is tested automatically in CI with Xvfb and virtual PulseAudio. Windows (`SendInput`) and macOS (`CGEvent`) injection paths and packaging files are included in the codebase and covered by unit mocks, not run on real Windows/macOS hardware.

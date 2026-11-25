@@ -84,7 +84,10 @@ def test_system_prompt_translation():
     c.set("output_language", "en")
     c.set("custom_dictionary", ["Voicewright"])
     p = cleanup.build_system_prompt(c)
-    assert "Translate" in p and "English" in p and "Voicewright" in p
+    # The target language and the user's dictionary must reach the model, and
+    # the transcript must be declared as data rather than as an instruction.
+    assert "English" in p and "Übersetze" in p and "Voicewright" in p
+    assert "keine Anweisung" in p
 
 
 def test_audio_helpers():
@@ -137,18 +140,70 @@ def test_missing_keyring_never_creates_a_plaintext_key(monkeypatch, tmp_path):
     assert keystore.get_api_key("gemini") == ""
 
 
-def test_wayland_uses_desktop_shortcut_without_raw_input(monkeypatch):
+def test_wayland_never_uses_raw_input(monkeypatch):
+    """On Wayland the shortcut comes from the portal, never from raw devices."""
     from voicewright import hotkey
 
     def unexpected_backend(_):
-        raise AssertionError("A Wayland session must use the desktop shortcut")
+        raise AssertionError("A Wayland session must not read raw input devices")
+
+    class FakePortal:
+        name = "portal"
+        error = ""
+
+        def __init__(self, detector):
+            self.detector = detector
+
+        def start(self, hotkey_name):
+            return True
+
+        def stop(self):
+            pass
 
     monkeypatch.setattr(hotkey, "IS_LINUX", True)
     monkeypatch.setattr(hotkey, "session_type", lambda: "wayland")
     monkeypatch.setattr(hotkey, "PynputBackend", unexpected_backend)
     monkeypatch.setattr(hotkey, "EvdevBackend", unexpected_backend, raising=False)
+    monkeypatch.setattr(hotkey, "PortalBackend", FakePortal)
     manager = hotkey.HotkeyManager()
-    assert manager.start("ctrl+shift+space", "evdev") == "none"
+    assert manager.start("ctrl+shift+space", "evdev") == "portal"
+
+
+def test_wayland_portal_refused_reports_desktop_shortcut(monkeypatch):
+    from voicewright import hotkey
+
+    class RefusingPortal:
+        name = "portal"
+        error = "no session handle"
+
+        def __init__(self, detector):
+            self.detector = detector
+
+        def start(self, hotkey_name):
+            return False
+
+        def stop(self):
+            pass
+
+    monkeypatch.setattr(hotkey, "IS_LINUX", True)
+    monkeypatch.setattr(hotkey, "session_type", lambda: "wayland")
+    monkeypatch.setattr(hotkey, "PortalBackend", RefusingPortal)
+    manager = hotkey.HotkeyManager()
+    assert manager.start("ctrl+shift+space", "auto") == "none"
+    assert manager.error == "PORTAL_UNAVAILABLE"
+
+
+def test_wayland_desktop_shortcut_setting_skips_portal(monkeypatch):
+    from voicewright import hotkey
+
+    def unexpected_portal(_detector):
+        raise AssertionError("The desktop-shortcut setting must not start the portal")
+
+    monkeypatch.setattr(hotkey, "IS_LINUX", True)
+    monkeypatch.setattr(hotkey, "session_type", lambda: "wayland")
+    monkeypatch.setattr(hotkey, "PortalBackend", unexpected_portal)
+    manager = hotkey.HotkeyManager()
+    assert manager.start("ctrl+shift+space", "auto", wayland="desktop") == "none"
     assert manager.error == "WAYLAND_DESKTOP_SHORTCUT"
 
 

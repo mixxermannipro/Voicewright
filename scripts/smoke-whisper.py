@@ -48,14 +48,15 @@ def main(cache: Path) -> None:
     with tempfile.TemporaryDirectory(prefix="voicewright-whisper-") as scratch:
         directory = Path(scratch)
         os.environ["VOICEWRIGHT_DATA_DIR"] = scratch
-        model = directory / "models" / "tiny"
+        model = directory / "models" / "whisper-tiny"
         prepare_model(cache)
         shutil.copytree(cache, model)
 
         app = QApplication([])
         config = Config(directory / "config.json")
-        config.set("whisper_model", "tiny")
+        config.set("speech_model", "whisper-tiny")
         config.set("whisper_device", "cpu")
+        config.set("insert_mode", "clipboard")
         config.set("add_trailing_space", False)
         transcriber = Transcriber(config)
         output = Injector(config)

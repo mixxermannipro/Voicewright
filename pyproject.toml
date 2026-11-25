@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "voicewright"
-version = "1.0.0"
-description = "Local-first voice dictation: offline Whisper transcription, AI cleanup with your own API key, inserted at your cursor."
+version = "2.0.0"
+description = "Local-first voice dictation: offline Parakeet/Whisper transcription, local LLM or rule-based cleanup, inserted at your cursor."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
@@ -16,9 +16,12 @@ dependencies = [
   "numpy>=1.24",
   "pynput>=1.8.1",
   "keyring>=24.0",
+  "jeepney>=0.8.0; sys_platform == 'linux'",
 ]
 
 [project.optional-dependencies]
+asr = ["sherpa-onnx>=1.10"]
+x11 = ["python-xlib>=0.33"]
 dev = ["pyinstaller>=6.6", "pytest>=8", "pillow>=10"]
 
 [project.gui-scripts]

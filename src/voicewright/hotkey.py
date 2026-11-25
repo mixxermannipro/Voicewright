@@ -123,6 +123,26 @@ class ComboDetector:
         with self._lock:
             return any(m in self.pressed for m in MODIFIERS)
 
+    # Portal events are already combo-level: the compositor decided that the
+    # shortcut was pressed. No key names are involved.
+    def press_portal(self) -> None:
+        fire = None
+        with self._lock:
+            if not self.active:
+                self.active = True
+                fire = self.on_activate
+        if fire:
+            fire()
+
+    def release_portal(self) -> None:
+        fire = None
+        with self._lock:
+            if self.active:
+                self.active = False
+                fire = self.on_deactivate
+        if fire:
+            fire()
+
     def reset(self) -> None:
         with self._lock:
             self.pressed.clear()
@@ -199,22 +219,70 @@ class NullBackend:
 
 
 # ---------------------------------------------------------------------------
+# Wayland portal backend
+# ---------------------------------------------------------------------------
+def portal_trigger(hotkey: str) -> str:
+    """Convert 'ctrl+shift+space' into the accelerator the portal expects."""
+    keys = parse_hotkey(hotkey)
+    order = [m for m in MODIFIERS if m in keys]
+    rest = sorted(k for k in keys if k not in MODIFIERS)
+    names = {"ctrl": "CTRL", "shift": "SHIFT", "alt": "ALT", "cmd": "LOGO"}
+    return "+".join([names[m] for m in order] + [k.upper() if len(k) == 1 else k.upper()
+                                                 for k in rest])
+
+
+class PortalBackend:
+    """Global shortcut through org.freedesktop.portal.GlobalShortcuts."""
+
+    name = "portal"
+
+    def __init__(self, detector: ComboDetector) -> None:
+        from voicewright.portals import GlobalShortcutsPortal
+        self.detector = detector
+        self._portal = GlobalShortcutsPortal(
+            on_press=detector.press_portal,
+            on_release=detector.release_portal,
+        )
+
+    def start(self, hotkey: str) -> bool:
+        return self._portal.start(trigger=portal_trigger(hotkey))
+
+    def stop(self) -> None:
+        self._portal.stop()
+
+    @property
+    def error(self) -> str:
+        return self._portal.error
+
+
+# ---------------------------------------------------------------------------
 class HotkeyManager:
     def __init__(self) -> None:
         self.detector = ComboDetector()
         self.backend = None
         self.error = ""
 
-    def start(self, hotkey: str, backend: str = "auto") -> str:
+    def start(self, hotkey: str, backend: str = "auto", wayland: str = "portal") -> str:
         """Start listening. Returns the backend name actually used."""
         self.stop()
         self.error = ""
         self.detector.set_combo(parse_hotkey(hotkey))
-        self.backend = NullBackend(self.detector)
+
         if IS_LINUX and session_type() == "wayland":
-            self.error = "WAYLAND_DESKTOP_SHORTCUT"
+            if wayland == "portal" and backend != "none":
+                portal = PortalBackend(self.detector)
+                if portal.start(hotkey):
+                    self.backend = portal
+                    return "portal"
+                self.error = "PORTAL_UNAVAILABLE"
+                log.info("GlobalShortcuts portal unavailable: %s", portal.error)
+            else:
+                self.error = "WAYLAND_DESKTOP_SHORTCUT"
+            self.backend = NullBackend(self.detector)
             return "none"
+
         if backend == "none":
+            self.backend = NullBackend(self.detector)
             return "none"
         try:
             listener = PynputBackend(self.detector)
@@ -222,6 +290,7 @@ class HotkeyManager:
         except Exception:
             self.error = "HOTKEY_UNAVAILABLE"
             log.warning("Global shortcut backend unavailable")
+            self.backend = NullBackend(self.detector)
             return "none"
         self.backend = listener
         return "pynput"
