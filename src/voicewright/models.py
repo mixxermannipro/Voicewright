@@ -345,6 +345,15 @@ def disk_usage_mb(model_id: str) -> float:
     return sum(f.stat().st_size for f in p.rglob("*") if f.is_file()) / (1024 * 1024)
 
 
+def recommended_model(cuda: bool = False, sherpa: bool = False) -> str:
+    """Return the recommended speech model ID for the current hardware."""
+    if sherpa:
+        return "parakeet-v3"
+    if cuda:
+        return "whisper-large-v3-turbo"
+    return "whisper-small"
+
+
 def _sha256(path: Path) -> str:
     h = hashlib.sha256()
     with open(path, "rb") as fh:

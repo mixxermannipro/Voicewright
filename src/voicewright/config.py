@@ -119,6 +119,24 @@ V1_KEYS = (
     "history_limit",
 )
 
+LEGACY_MODEL_MAP: dict[str, str] = {
+    "tiny": "whisper-tiny",
+    "tiny.en": "whisper-tiny",
+    "base": "whisper-base",
+    "base.en": "whisper-base",
+    "small": "whisper-small",
+    "small.en": "whisper-small",
+    "medium": "whisper-medium",
+    "large-v3-turbo": "whisper-large-v3-turbo",
+    "large-v3": "whisper-large-v3",
+}
+
+
+def _map_model_id(model_id: Any) -> Any:
+    if isinstance(model_id, str):
+        return LEGACY_MODEL_MAP.get(model_id, model_id)
+    return model_id
+
 
 def _deep_merge(base: dict, override: dict) -> dict:
     out = copy.deepcopy(base)
@@ -139,13 +157,18 @@ def migrate(data: dict[str, Any]) -> dict[str, Any]:
     if version < 2:
         legacy_model = data.get("whisper_model")
         if legacy_model and "speech_model" not in data:
-            data["speech_model"] = legacy_model
+            data["speech_model"] = _map_model_id(legacy_model)
         # v1 had separate toggle/hold modes. Both keep working; new installs
         # start in hybrid mode because it covers both gestures.
         if data.get("hotkey_mode") not in ("toggle", "hold", "hybrid"):
             data["hotkey_mode"] = "hybrid"
         data.setdefault("cleanup_enabled", False)
         data["version"] = 2
+
+    if data.get("speech_model"):
+        data["speech_model"] = _map_model_id(data["speech_model"])
+    if data.get("whisper_model"):
+        data["whisper_model"] = _map_model_id(data["whisper_model"])
 
     # Keep the legacy alias consistent in both directions.
     if data.get("speech_model") and not data.get("whisper_model"):
@@ -199,8 +222,8 @@ class Config:
             if not isinstance(loaded, dict):
                 log.error("Config is not an object; using defaults")
                 return
-            merged = _deep_merge(DEFAULT_CONFIG, loaded)
-            self._data = migrate(merged)
+            migrated = migrate(loaded)
+            self._data = _deep_merge(DEFAULT_CONFIG, migrated)
 
     def save(self) -> None:
         with self._lock:
@@ -214,9 +237,12 @@ class Config:
 
     def set(self, key: str, value: Any, save: bool = True) -> None:
         with self._lock:
-            self._data[key] = value
-            if key == "speech_model":
-                self._data["whisper_model"] = value
+            if key in ("speech_model", "whisper_model"):
+                mapped = _map_model_id(value)
+                self._data["speech_model"] = mapped
+                self._data["whisper_model"] = mapped
+            else:
+                self._data[key] = value
             if save:
                 self.save()
 
@@ -224,7 +250,13 @@ class Config:
         with self._lock:
             self._data.update(values)
             if "speech_model" in values:
-                self._data["whisper_model"] = values["speech_model"]
+                mapped = _map_model_id(values["speech_model"])
+                self._data["speech_model"] = mapped
+                self._data["whisper_model"] = mapped
+            elif "whisper_model" in values:
+                mapped = _map_model_id(values["whisper_model"])
+                self._data["speech_model"] = mapped
+                self._data["whisper_model"] = mapped
             self.save()
 
     def cleanup_model(self, provider: str) -> str:

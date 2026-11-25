@@ -23,9 +23,9 @@ export XDG_SESSION_TYPE=wayland QT_QPA_PLATFORM=xcb PYTHONFAULTHANDLER=1
 export PULSE_SERVER="unix:$scratch/pulse.sock"
 export ALSA_CONFIG_PATH="$scratch/asound.conf"
 mkdir -m 700 -p -- "$HOME" "$XDG_RUNTIME_DIR" "$VOICEWRIGHT_CONFIG_DIR" "$VOICEWRIGHT_DATA_DIR/models"
-cp -r -- "$model" "$VOICEWRIGHT_DATA_DIR/models/tiny"
+cp -r -- "$model" "$VOICEWRIGHT_DATA_DIR/models/whisper-tiny"
 cat > "$VOICEWRIGHT_CONFIG_DIR/config.json" <<'JSON'
-{"whisper_model":"tiny","whisper_device":"cpu","sounds_enabled":false,"add_trailing_space":false}
+{"whisper_model":"tiny","whisper_device":"cpu","sounds_enabled":false,"add_trailing_space":false,"insert_mode":"clipboard"}
 JSON
 cat > "$scratch/asound.conf" <<'ALSA'
 pcm.!default {
@@ -57,10 +57,10 @@ version=$(PYTHONPATH=src python3.11 -c 'from voicewright import __version__; pri
 app_pid=$!
 for _ in {1..80}; do
     if ! kill -0 "$app_pid" 2>/dev/null; then cat "$scratch/startup.log"; exit 1; fi
-    if grep -q 'Loaded Whisper model tiny' "$scratch/startup.log"; then break; fi
+    if grep -q 'Loaded Whisper whisper-tiny' "$scratch/startup.log"; then break; fi
     sleep .25
 done
-grep -q 'Loaded Whisper model tiny' "$scratch/startup.log" || { cat "$scratch/startup.log"; exit 1; }
+grep -q 'Loaded Whisper whisper-tiny' "$scratch/startup.log" || { cat "$scratch/startup.log"; exit 1; }
 
 check_dictation() {
     local voice=$1 phrase=$2 word=$3 text=
