@@ -11,7 +11,7 @@ from logging.handlers import RotatingFileHandler
 from voicewright import APP_ID, APP_NAME, __version__
 from voicewright.paths import logs_dir
 
-COMMANDS = ("toggle", "start", "stop", "cancel", "show", "quit")
+COMMANDS = ("toggle", "start", "stop", "cancel", "transform", "show", "quit")
 
 
 def _setup_logging(debug: bool) -> None:
@@ -93,9 +93,14 @@ def main(argv: list[str] | None = None) -> int:
 
     from voicewright.config import Config
     from voicewright.i18n import set_language
+    from voicewright.ui import theme, widgets
 
     config = Config()
     set_language(config.get("ui_language", "auto"))
+    pal = theme.resolve(config.get("theme", "system"))
+    theme.set_active(pal)
+    app.setStyleSheet(theme.qss(pal))
+    widgets.set_motion(not bool(config.get("reduce_motion", False)))
 
     from voicewright.app import Controller
     from voicewright.i18n import tr

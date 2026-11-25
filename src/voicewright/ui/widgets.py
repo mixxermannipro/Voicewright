@@ -6,6 +6,7 @@ the ``reduce_motion`` setting.
 """
 from __future__ import annotations
 
+import math
 from typing import Iterable, Optional
 
 from PySide6.QtCore import (
@@ -13,7 +14,7 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import (
-    QAbstractButton, QFrame, QHBoxLayout, QLabel, QSizePolicy, QVBoxLayout, QWidget,
+    QAbstractButton, QFrame, QHBoxLayout, QLabel, QPushButton, QSizePolicy, QVBoxLayout, QWidget,
 )
 
 from voicewright.ui import theme
@@ -252,19 +253,18 @@ class Segmented(QWidget):
         self.setObjectName("Segmented")
         self.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
         self.setFixedHeight(34)
-        self._items: list[tuple[str, QAbstractButton]] = []
+        self._items: list[tuple[str, QPushButton]] = []
         self._index = 0
         lay = QHBoxLayout(self)
         lay.setContentsMargins(3, 3, 3, 3)
         lay.setSpacing(2)
         for value, label in options:
-            btn = QAbstractButton(self)
-            btn.setText(label)
+            btn = QPushButton(label, self)
             btn.setCheckable(True)
             btn.setCursor(Qt.PointingHandCursor)
             btn.clicked.connect(lambda _=False, v=value: self.set_value(v, emit=True))
             btn.setStyleSheet(
-                "QAbstractButton { background: transparent; border: none; padding: 5px 14px;"
+                "QPushButton { background: transparent; border: none; padding: 5px 14px;"
                 " font-weight: 600; }")
             lay.addWidget(btn)
             self._items.append((value, btn))
@@ -313,10 +313,14 @@ class Segmented(QWidget):
         painter.setBrush(QColor(p.field))
         painter.drawRoundedRect(rect, radius, radius)
 
-        first = self._items[0][1]
-        seg_w = first.width() + 2
-        x = 3 + self._slide * seg_w
-        pill = QRectF(x, 3, seg_w - 2, self.height() - 6)
+        idx_lo = max(0, min(len(self._items) - 1, int(math.floor(self._slide))))
+        idx_hi = max(0, min(len(self._items) - 1, int(math.ceil(self._slide))))
+        frac = self._slide - idx_lo
+        g_lo = self._items[idx_lo][1].geometry()
+        g_hi = self._items[idx_hi][1].geometry()
+        x = g_lo.x() + (g_hi.x() - g_lo.x()) * frac
+        w = g_lo.width() + (g_hi.width() - g_lo.width()) * frac
+        pill = QRectF(x, 3, max(4.0, float(w)), self.height() - 6)
         painter.setPen(QPen(QColor(p.border_strong), 1))
         painter.setBrush(QColor(p.card))
         painter.drawRoundedRect(pill, pill.height() / 2, pill.height() / 2)
@@ -333,21 +337,20 @@ class NavList(QWidget):
 
     def __init__(self, labels: Iterable[tuple[str, str]], parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
-        self._buttons: list[QAbstractButton] = []
+        self._buttons: list[QPushButton] = []
         self._current = 0
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(2)
         for glyph, label in labels:
-            btn = QAbstractButton(self)
-            btn.setText(f"{glyph}   {label}" if glyph else label)
+            btn = QPushButton(f"{glyph}   {label}" if glyph else label, self)
             btn.setCheckable(True)
             btn.setCursor(Qt.PointingHandCursor)
             btn.setStyleSheet(
-                "QAbstractButton { text-align: left; padding: 9px 14px; border: none;"
+                "QPushButton { text-align: left; padding: 9px 14px; border: none;"
                 " border-radius: 10px; background: transparent; color: palette(mid); }"
-                "QAbstractButton:hover { background: rgba(127,127,127,0.10); }"
-                "QAbstractButton:checked { background: rgba(127,127,127,0.14);"
+                "QPushButton:hover { background: rgba(127,127,127,0.10); }"
+                "QPushButton:checked { background: rgba(127,127,127,0.14);"
                 " font-weight: 650; }")
             btn.clicked.connect(lambda _=False, i=len(self._buttons): self.set_current(i))
             lay.addWidget(btn)

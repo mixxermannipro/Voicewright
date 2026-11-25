@@ -105,7 +105,7 @@ class Controller(QObject):
         app.setWindowIcon(self.icons["idle"])
 
         self.settings = SettingsWindow(config, self.history, self.stats, self.icons["idle"])
-        self.settings.hotkeyConfigChanged.connect(self.restart_hotkeys)
+        self.settings.hotkeyConfigChanged.connect(self._on_hotkey_config_changed)
         self.settings.captureActive.connect(self._set_capture)
         self.settings.modelChanged.connect(self._on_model_changed)
         self.settings.cleanupChanged.connect(self._on_cleanup_changed)
@@ -220,22 +220,37 @@ class Controller(QObject):
         self.hotkeys_paused = active
         self.hotkeys.detector.reset()
 
+    @Slot()
+    def _on_hotkey_config_changed(self) -> None:
+        self.machine.configure(
+            mode=self.config.get("hotkey_mode", "hybrid"),
+            tap_threshold_ms=int(self.config.get("tap_threshold_ms", 350)),
+            min_hold_ms=int(self.config.get("min_hold_ms", 250)),
+        )
+        self._sync_mode_actions()
+        self.restart_hotkeys()
+
     def _on_model_changed(self) -> None:
         if self.state == "idle":
             self.transcriber.unload()
             self._preload_model()
+        self.settings.refresh_overview()
 
     def _on_cleanup_changed(self) -> None:
         self.cleaner = Cleaner(self.config, self.cleaner._runtime)
 
     def _on_output_changed(self) -> None:
-        self.settings.set_status(self.injector.describe_method())
+        desc = self.injector.describe_method()
+        self.settings.refresh_output(desc)
+        self.settings.set_status(desc)
 
     def show_settings(self, tab: int | None = None) -> None:
         if tab is not None:
-            self.settings.tabs.setCurrentIndex(tab)
+            self.settings.select_page(tab)
+        self.settings.refresh_overview()
         self.settings.refresh_history()
         self.settings.refresh_stats()
+        self.settings.refresh_output(self.injector.describe_method())
         self.settings.show()
         self.settings.raise_()
         self.settings.activateWindow()
@@ -482,7 +497,7 @@ class Controller(QObject):
             else:
                 self.notify(tr("Keyboard control was not granted. Voicewright falls back to "
                                "wtype or the clipboard."), error=True)
-            self.settings.refresh_output()
+            self.settings.refresh_output(self.injector.describe_method())
 
         run_task(self.injector.connect_portal, on_done=done,
                  on_error=lambda e: self.notify(str(e), error=True))
