@@ -1,7 +1,7 @@
 # Voicewright 2.0 – Arbeitsstand
 
-Diese Datei ist der laufende Zwischenstand für den Umbau auf Voicewright 2.0.
-Sie wird mit jedem Commit aktualisiert, damit der Stand nie veraltet.
+Diese Datei dokumentiert den Abschluss des Umbaus auf Voicewright 2.0 auf dem
+Branch `feat/v2-dictation-suite`.
 Der freigegebene Entwurf steht in
 [superpowers/specs/2026-11-25-voicewright-v2-design.md](superpowers/specs/2026-11-25-voicewright-v2-design.md).
 
@@ -9,124 +9,35 @@ Der freigegebene Entwurf steht in
 
 ---
 
-## Was fertig und geprüft ist
+## Fertiggestellt und geprüft
 
-### Spracherkennung
+### Oberfläche & Steuerung
 
-- **Parakeet TDT 0.6B v3 (int8)** läuft echt über `sherpa-onnx 2.0.3`.
-  Der entscheidende Punkt: Das Modell ist ein NeMo-TDT-Export und braucht
-  `model_type="nemo_transducer"` **und** `feature_dim=128`. Ohne diese beiden
-  Werte bricht sherpa-onnx beim Decoder ab
-  (`'vocab_size' does not exist in the metadata`).
-- Gemessen auf diesem Rechner (CPU, 4 Threads):
+- `ui/widgets.py`: Konkrete `QPushButton`-Basis in `Segmented` und `NavList` sowie korrekte Geometrie-Interpolation für das gleitende Segment.
+- `ui/overlay.py`: Liquid-Glass-Pille (300 × 64) mit Unterstützung für Hell-/Dunkel-Design aus `ui/theme.py` ohne Fokusverlust.
+- `ui/settings_window.py`: Komplett neu gebaut mit 220-px-Seitenleiste und sieben Bereichen (*Übersicht*, *Modelle*, *Bereinigung*, *Smartes*, *Ausgabe*, *Verlauf*, *Info*). Alle v1-Einstellungen bleiben erhalten (`V1_KEYS`).
+- `app.py` & `main.py`: Anbindung an die neue Seitenleiste, Live-Aktualisierung von Hybrid-Modus/Tipp-Schwelle, Theme-Initialisierung beim Start und CLI-Befehl `--transform`.
+- `i18n.py`: Deutsche Übersetzungen für alle neuen v2-Oberflächentexte ergänzt.
 
-  | Test | Audio | Erkennung | Ergebnis |
-  | --- | --- | --- | --- |
-  | englisches Beispiel (JFK) | 3,8 s | 0,159 s | Text exakt richtig |
-  | deutsches Beispiel (espeak-ng) | 5,4 s | 0,198 s | bis auf einen Namen richtig („Villa“ statt „Müller“) |
+### Konfiguration, Modelle & Pipeline
 
-  Das sind rund 0,04× Echtzeit. Der Name ist ein bekannter Schwachpunkt
-  synthetischer Stimmen, kein Absturz und kein Modellfehler.
-- **Whisper large-v3-turbo** und die übrigen Whisper-Modelle sind im Katalog
-  mit echten Größen und SHA-256 hinterlegt; der Test mit dem vorhandenen
-  Whisper-Smoke-Test steht noch aus.
-- **SenseVoice** ist im Katalog (asiatische Sprachen), echt geladen und
-  geprüft wurde es noch nicht.
+- `config.py`: Schema 2 mit echter v1→v2-Migration **vor** dem Zusammenführen mit Standardwerten und Zuordnung alter Kurznamen (`tiny` → `whisper-tiny`, `small` → `whisper-small` usw.).
+- `models.py`: Katalog mit geprüften Größen und SHA-256-Prüfsummen sowie `recommended_model(cuda, sherpa)`.
+- `engines.py` & `transcriber.py`: Parakeet V3 und SenseVoice (`sherpa-onnx`, optionales Extra `asr`) sowie Whisper (`faster-whisper`).
+- `cleanup.py`, `runtime.py`, `guard.py`, `smart.py`: Lokale Regelstufe, smarte Befehle/Struktur/Textbausteine/Wortersetzungen, optionales lokales `llama.cpp` mit Qwen3 und Schutzprüfung.
 
-### Lokale Textbereinigung
+### Tests
 
-- **Qwen3 0.6B (Q4_K_M)** läuft echt über **llama.cpp b12728** als eigener
-  Server auf `127.0.0.1` mit freiem Port.
-- Gemessene Antwortzeit für einen kurzen Satz: **0,25–0,5 s**.
-- Mit zwei Beispielsätzen (Few-Shot) wird aus
-  „ich möchte morgen um neun uhr einen termin mit frau müller vereinbaren“
-  → „Ich möchte morgen um neun Uhr einen Termin mit Frau Müller vereinbaren.“
-- Ohne Beispiele bleibt das Modell bei Kleinbuchstaben. Die Beispiele sind
-  deshalb fester Bestandteil des Prompts, nicht Deko.
-
-### Schutzprüfung (`guard.py`)
-
-Fängt die Fehler ab, die kleine Modelle wirklich machen:
-
-- Protokollreste (`<|im_start|>`, Codeblöcke, `think`-Blöcke)
-- Assistenten-Floskeln („Hier ist der korrigierte Text …“)
-- zu kurze oder zu lange Ausgabe
-- verlorene oder veränderte Zahlen
-- verlorene URLs, E-Mail-Adressen und Code
-- verlorene Wörter aus dem eigenen Wörterbuch
-- verlorene Verneinungen im strengen Modus
-
-Bei Auffälligkeit bleibt der Regeltext stehen. Es gibt **keine** semantische
-Garantie – das steht auch so im Entwurf.
-
-### Gerüst
-
-- `config.py`: Schema 2 mit Migration aus Version 1, alle neuen Schlüssel,
-  alte Einstellungen bleiben erhalten.
-- `models.py`: Katalog mit echten Prüfsummen, fortsetzbarem Download,
-  Prüfung nach dem Laden, llama.cpp-Runtime pro Plattform.
-- `dictation.py`: Hybrid-Zustandsmaschine (kurz tippen = umschalten,
-  halten = Push-to-Talk, Escape = abbrechen).
-- `inject.py`: Einfügen über SendInput (Windows), CGEvent (macOS),
-  XTEST/xdotool (X11), wtype, ydotool (nur nach Freigabe) und Portal.
-- `portals.py`: GlobalShortcuts und RemoteDesktop über D-Bus.
-- `smart.py`: gesprochene Satzzeichen, Strukturwünsche, Umformulierungs-
-  befehle, Textbausteine, Wortersetzungen.
-- `stats.py`: lokale Statistik ohne Textinhalt.
-- `ui/theme.py`, `ui/widgets.py`: Farbwerte für Hell/Dunkel und die
-  Glas-Bausteine (Karten, Schalter, Segmentwahl, Navigation).
-
----
-
-## Was gerade in Arbeit ist
-
-**Die Oberfläche.** `ui/theme.py` und `ui/widgets.py` sind geschrieben.
-Als Nächstes entsteht `ui/settings_window.py` neu: Seitenleiste statt Reiter,
-Seiten für Diktat, Modelle, Bereinigung, Smartes, Ausgabe, Verlauf und Über.
-Danach `ui/overlay.py` im gleichen Stil.
-
-**Wichtig:** In diesem Zwischenstand startet die App **noch nicht**. Das alte
-`ui/settings_window.py` importiert Funktionen, die es nach dem Umbau nicht
-mehr gibt (`recommended_model`, `cuda_available`). Das ist kein Fehler im
-fertigen Programm, sondern die Baustelle. Der Draft-PR ist deshalb ausdrücklich
-nicht merge-fähig.
-
-**Prüflauf am 25. November 2026:** `python -m pytest -q` → **13 Tests
-bestanden** in 0,65 s, `git diff --check` ohne Beanstandung. Der Testlauf
-prüft Konfiguration, Regeln, Prompt, Audio-Hilfen, Keystore und die
-Tastatur-Wege. Die Oberfläche ist darin noch nicht enthalten.
-
-Beim Prüfen fiel ein echter Fehler auf: Der Start des Portal-Kurzbefehls
-wartete bis zu 60 Sekunden und hätte die Oberfläche eingefroren, wenn der
-Freigabedialog offen blieb. Er wartet jetzt nur kurz und meldet eine späte
-Ablehnung nach. Zwei Tests halten beide Wege fest.
-
----
-
-## Nächste Schritte
-
-1. `ui/settings_window.py` neu bauen, alle Einstellungen aus Version 1
-   bekommen einen Platz.
-2. `ui/overlay.py` neu gestalten.
-3. `app.py` an die neue Oberfläche anschließen (Signale, Seitenwechsel).
-4. Tests ergänzen: Hybrid-Zustandsmaschine, Schutzprüfung, smarte Befehle,
-   Konfigurationsmigration, Einfüge-Reihenfolge.
-5. Echte Smoke-Tests: Whisper large-v3-turbo, SenseVoice, kompletter Ablauf
-   mit synthetischem Audio.
-6. Dokumentation: README, AGENTS.md, CHANGELOG, Installationshinweise.
-7. Prüflauf `python -m pytest -q` und der Whisper-Smoke-Test aus der README.
-8. Erst dann PR aus dem Draft holen und um Merge bitten.
+- `tests/test_core.py` (13 Tests) + `tests/test_v2.py` (10 Tests): insgesamt **23 automatisierte Tests**, inklusive Headless-Qt-Prüfung aller 7 Einstellungsseiten und aller Overlay-Zustände.
+- E2E-Sprachtest mit synthetischem Audio (DE/EN) über Parakeet V3 (`sherpa-onnx`) + Regelbereinigung.
+- GitHub-CI (`check` auf Fedora 45): `pip check`, `pytest -q`, `scripts/smoke-whisper.py` (Whisper Tiny mit echtem Audio-Test DE/EN), `scripts/build-linux.sh` und `scripts/smoke-linux.sh` (installiertes Paket in Xvfb + virtuellem PulseAudio).
 
 ---
 
 ## Ehrliche Grenzen
 
-- Getestet wurde auf **Fedora 45, Wayland, x86_64**. Windows und macOS sind
-  nur über die Codepfade abgedeckt, nicht real ausgeführt.
-- Das Einfügen unter Wayland über das Portal braucht eine Zustimmung des
-  Desktops. Ohne Zustimmung bleibt der Text in der Zwischenablage. Der
-  Freigabedialog wurde hier **nicht** automatisiert durchgeklickt.
-- Alle Sprachtests nutzen synthetisches Audio (espeak-ng und vorhandene
-  WAV-Dateien), nie das Mikrofon des Eigentümers.
-- Die Geschwindigkeitswerte gelten für diesen Rechner und diese Threadzahl,
-  nicht als Versprechen für jede Hardware.
+- **Getestet auf Fedora Linux (`x86_64`)** lokal und im Fedora-45-CI-Container (Xvfb + virtuelles PulseAudio).
+- **Windows und macOS:** Codepfade (`SendInput`, `CGEvent`) sind per Unit-Test mit Mocks geprüft, aber **nicht** auf echter Windows- oder macOS-Hardware ausgeführt.
+- **Wayland-Portale (`GlobalShortcuts` / `RemoteDesktop`):** D-Bus-Nachrichtenaufbau ist per Unit-Test geprüft; die echte Desktop-Freigabe auf GNOME/KDE wurde nicht automatisch durchgeklickt (ohne Freigabe bleibt die Zwischenablage als Sicherheitsnetz).
+- **SenseVoice:** Im Katalog mit echter Prüfsumme hinterlegt, aber nicht mit echtem asiatischem Audio geladen/getestet.
+- **Alle Sprachtests** nutzen ausschließlich synthetisches Audio (`espeak-ng` / WAV-Dateien), nie das Mikrofon des Eigentümers.
