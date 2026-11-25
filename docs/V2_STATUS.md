@@ -91,6 +91,16 @@ mehr gibt (`recommended_model`, `cuda_available`). Das ist kein Fehler im
 fertigen Programm, sondern die Baustelle. Der Draft-PR ist deshalb ausdrücklich
 nicht merge-fähig.
 
+**Prüflauf am 25. November 2026:** `python -m pytest -q` → **13 Tests
+bestanden** in 0,65 s, `git diff --check` ohne Beanstandung. Der Testlauf
+prüft Konfiguration, Regeln, Prompt, Audio-Hilfen, Keystore und die
+Tastatur-Wege. Die Oberfläche ist darin noch nicht enthalten.
+
+Beim Prüfen fiel ein echter Fehler auf: Der Start des Portal-Kurzbefehls
+wartete bis zu 60 Sekunden und hätte die Oberfläche eingefroren, wenn der
+Freigabedialog offen blieb. Er wartet jetzt nur kurz und meldet eine späte
+Ablehnung nach. Zwei Tests halten beide Wege fest.
+
 ---
 
 ## Nächste Schritte
