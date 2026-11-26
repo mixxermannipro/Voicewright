@@ -95,27 +95,49 @@ def _request(conn, interface: str, method: str, signature: str, body: tuple,
     MatchRule, new_method_call = _imports()[1], _imports()[3]
     path = predict_request_path(conn.unique_name, token)
     rule = MatchRule(type="signal", interface=IFACE_REQUEST, member="Response", path=path)
+    from jeepney import MessageType
+
     with conn.filter(rule) as queue:
         msg = new_method_call(_addr(interface), method, signature, body)
-        conn.send(msg)
-        reply = conn.recv_until_filtered(queue, timeout=timeout)
-    return _results(reply)
+        # Wait for the method reply first. Portal methods return a Request
+        # handle right away; the result arrives later as a Response signal.
+        # Reading only the signal would silently drop a D-Bus error reply
+        # (for example an invalid restore token) and block until the timeout.
+        started = time.monotonic()
+        reply = conn.send_and_get_reply(msg, timeout=timeout)
+        if getattr(reply.header, "message_type", None) == MessageType.error:
+            name = reply.body[0] if reply.body else "org.freedesktop.DBus.Error.Failed"
+            detail = reply.body[1] if len(reply.body) > 1 else ""
+            raise PortalError(f"{name}: {detail}")
+        remaining = max(0.1, timeout - (time.monotonic() - started))
+        signal = conn.recv_until_filtered(queue, timeout=remaining)
+    response = signal.body[0] if signal.body else 2
+    if response == 1:
+        raise PortalError("cancelled by user")
+    if response != 0:
+        raise PortalError("portal request failed")
+    return _results(signal)
 
 
 # ---------------------------------------------------------------------------
 # Global shortcuts
 # ---------------------------------------------------------------------------
 class GlobalShortcutsPortal:
-    """Press/release shortcut delivery through the compositor."""
+    """Press/release shortcut delivery through the compositor.
 
-    def __init__(self, on_press: Callable[[], None],
-                 on_release: Callable[[], None]) -> None:
+    ``on_press`` and ``on_release`` receive the shortcut id, so one portal
+    session can serve the dictation and the rewrite shortcut.
+    """
+
+    def __init__(self, on_press: Optional[Callable[[str], None]] = None,
+                 on_release: Optional[Callable[[str], None]] = None) -> None:
         self.on_press = on_press
         self.on_release = on_release
         self._thread: Optional[threading.Thread] = None
         self._stop = threading.Event()
-        self._ready = threading.Event()
-        self._ok = False
+        self._conn = None
+        self._conn_lock = threading.Lock()
+        self._state: dict[str, bool] = {"ok": False}
         self.error = ""
 
     def available(self) -> bool:
@@ -130,10 +152,13 @@ class GlobalShortcutsPortal:
         conn.close()
         return True
 
-    def start(self, shortcut_id: str = "dictate", description: str = "Dictate",
-              trigger: str = "CTRL+SHIFT+SPACE", timeout: float = 60.0,
-              wait: float = 0.4) -> bool:
-        """Start listening.
+    def start(self, shortcuts=None, *, shortcut_id: str = "dictate",
+              description: str = "Dictate", trigger: str = "CTRL+SHIFT+space",
+              timeout: float = 60.0, wait: float = 0.4) -> bool:
+        """Start listening for one or more shortcuts.
+
+        ``shortcuts`` is a list of ``(id, description, trigger)`` tuples. The
+        keyword arguments are the single-shortcut compatibility form.
 
         The compositor shows its permission dialog on its own schedule, so this
         returns after a short, bounded wait instead of blocking the caller for
@@ -141,32 +166,58 @@ class GlobalShortcutsPortal:
         :attr:`error` and stops the loop.
         """
         if self._thread is not None and self._thread.is_alive():
-            return self._ok
-        self._stop.clear()
-        self._ready.clear()
-        self._ok = False
+            return bool(self._state.get("ok"))
+        if shortcuts is None:
+            shortcuts = [(shortcut_id, description, trigger)]
+        elif isinstance(shortcuts, tuple) and len(shortcuts) == 3 and isinstance(shortcuts[0], str):
+            shortcuts = [shortcuts]
+        shortcuts = [tuple(s) for s in shortcuts if s and s[0]]
+        if not shortcuts:
+            self.error = "no shortcuts to bind"
+            return False
+        # Each run gets its own events. A previous thread may still be blocked
+        # in a portal request after stop() timed out; if it shared these
+        # events, a later start() would wake the old thread up again and two
+        # listeners would deliver every shortcut twice.
+        stop = threading.Event()
+        ready = threading.Event()
+        self._stop = stop
+        # The result lives with the run, not on the object: an old thread that
+        # times out must not overwrite the state of a newer run.
+        state = {"ok": False}
+        self._state = state
         self.error = ""
         self._thread = threading.Thread(
-            target=self._run, args=(shortcut_id, description, trigger, timeout),
+            target=self._run, args=(shortcuts, timeout, stop, ready, state),
             daemon=True, name="portal-shortcuts")
         self._thread.start()
-        self._ready.wait(max(0.0, wait))
-        return self._ok or self._thread.is_alive()
+        if ready.wait(max(0.0, wait)):
+            return bool(state["ok"])
+        # The compositor is still showing its permission dialog. Report the
+        # optimistic state and let the loop finish in the background.
+        return self._thread.is_alive()
 
-    def _run(self, shortcut_id: str, description: str, trigger: str, timeout: float) -> None:
+    def _run(self, shortcuts: list[tuple], timeout: float,
+             stop: threading.Event, ready: threading.Event,
+             state: dict[str, bool]) -> None:
         try:
-            self._loop(shortcut_id, description, trigger, timeout)
+            self._loop(shortcuts, timeout, stop, ready, state)
         except Exception as exc:  # noqa: BLE001
             self.error = str(exc)
             log.warning("GlobalShortcuts portal failed: %s", exc)
         finally:
-            self._ok = False
-            self._ready.set()
+            ready.set()
 
-    def _loop(self, shortcut_id: str, description: str, trigger: str, timeout: float) -> None:
-        DBusAddress, MatchRule, _, new_method_call, open_conn = _imports()
+    def _loop(self, shortcuts: list[tuple], timeout: float,
+              stop: threading.Event, ready: threading.Event,
+              state: dict[str, bool]) -> None:
+        _, MatchRule, _, _, open_conn = _imports()
         conn = open_conn(bus="SESSION")
+        with self._conn_lock:
+            self._conn = conn
         try:
+            if stop.is_set():
+                return
             session_token = _token("vw_session")
             results = _request(
                 conn, IFACE_SHORTCUTS, "CreateSession", "a{sv}",
@@ -180,58 +231,108 @@ class GlobalShortcutsPortal:
             if isinstance(session, tuple):
                 session = session[1]
 
+            bind_list = []
+            for sid, desc, trigger in shortcuts:
+                options = {"description": ("s", desc or sid)}
+                if trigger:
+                    options["preferred_trigger"] = ("s", trigger)
+                bind_list.append((sid, options))
+
             bind_results = _request(
                 conn, IFACE_SHORTCUTS, "BindShortcuts", "oa(sa{sv})sa{sv}",
-                (
-                    session,
-                    [(shortcut_id, {"description": ("s", description),
-                                    "preferred_trigger": ("s", trigger)})],
-                    "",
-                    {"handle_token": ("s", _token("vw_bind"))},
-                ),
+                (session, bind_list, "", {"handle_token": ("s", _token("vw_bind"))}),
                 _token("vw_req_bind"), timeout=timeout,
             )
             bound = bind_results.get("shortcuts") or []
-            if not bound:
+            bound_ids = {item[0] for item in bound if item and item[0]}
+            if not bound_ids:
                 raise PortalError("compositor did not bind the shortcut")
 
-            self._ok = True
-            self._ready.set()
+            # ListShortcuts is optional in older portal versions. It tells us
+            # which of the requested shortcuts really exist after the user
+            # edited them in the compositor dialog.
+            try:
+                listed = _request(
+                    conn, IFACE_SHORTCUTS, "ListShortcuts", "oa{sv}",
+                    (session, {"handle_token": ("s", _token("vw_list"))}),
+                    _token("vw_req_list"), timeout=min(timeout, 8.0),
+                )
+                listed_ids = {item[0] for item in (listed.get("shortcuts") or [])
+                              if item and item[0]}
+                if listed_ids:
+                    bound_ids &= listed_ids
+                    log.info("Global shortcuts bound: %s", ", ".join(sorted(bound_ids)))
+            except PortalError as exc:
+                log.debug("ListShortcuts unavailable: %s", exc)
+
+            if not bound_ids:
+                raise PortalError("no usable shortcut was bound")
+
+            state["ok"] = True
+            ready.set()
 
             rule = MatchRule(type="signal", interface=IFACE_SHORTCUTS)
             with conn.filter(rule) as queue:
-                while not self._stop.is_set():
+                while not stop.is_set():
                     try:
                         msg = conn.recv_until_filtered(queue, timeout=0.5)
                     except TimeoutError:
                         continue
-                    self._dispatch(msg, session, shortcut_id)
+                    self._dispatch(msg, session, bound_ids)
         finally:
+            with self._conn_lock:
+                if self._conn is conn:
+                    self._conn = None
             conn.close()
 
-    def _dispatch(self, msg, session: str, shortcut_id: str) -> None:
+    def _dispatch(self, msg, session: str, shortcut_ids) -> None:
+        from jeepney import HeaderFields
+
         try:
-            member = msg.header.fields.get(9) or msg.header.fields.get("member")
+            # Header field 3 is MEMBER; field 9 is UNIX_FDS. The old lookup
+            # returned None, so no portal shortcut ever reached the detector.
+            member = msg.header.fields.get(HeaderFields.member)
         except Exception:
             member = None
         body = msg.body or ()
+        shortcut_id = None
         if len(body) >= 2:
-            incoming_session, incoming_id = body[0], body[1]
-            if incoming_session != session or incoming_id != shortcut_id:
+            incoming_session, shortcut_id = body[0], body[1]
+            if incoming_session != session:
                 return
+            if isinstance(shortcut_ids, str):
+                if shortcut_id != shortcut_ids:
+                    return
+            elif shortcut_id not in shortcut_ids:
+                return
+        elif isinstance(shortcut_ids, str):
+            shortcut_id = shortcut_ids
+        else:
+            return
         if member == "Activated":
             try:
-                self.on_press()
+                if self.on_press is not None:
+                    self.on_press(shortcut_id)
             except Exception:  # noqa: BLE001
                 log.exception("Shortcut press handler failed")
         elif member == "Deactivated":
             try:
-                self.on_release()
+                if self.on_release is not None:
+                    self.on_release(shortcut_id)
             except Exception:  # noqa: BLE001
                 log.exception("Shortcut release handler failed")
 
     def stop(self) -> None:
         self._stop.set()
+        # Closing the connection unblocks a thread that is still waiting for
+        # a portal reply, so it cannot start listening again after a restart.
+        with self._conn_lock:
+            conn, self._conn = self._conn, None
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:  # noqa: BLE001
+                pass
         if self._thread is not None:
             self._thread.join(timeout=2)
             self._thread = None
@@ -241,35 +342,56 @@ class GlobalShortcutsPortal:
 # Remote desktop (keyboard injection)
 # ---------------------------------------------------------------------------
 class RemoteDesktopPortal:
-    """Keyboard control granted by the compositor after an explicit dialog."""
+    """Keyboard control granted by the compositor after an explicit dialog.
 
-    def __init__(self) -> None:
+    ``persist_mode=2`` asks the portal to keep the permission until the user
+    revokes it. The returned ``restore_token`` is stored by the caller and
+    reused on the next start, so the dialog appears only once. The portal
+    invalidates a token after one use and returns a fresh one; the callback
+    updates the stored value every time.
+    """
+
+    def __init__(self, on_restore_token: Optional[Callable[[str], None]] = None) -> None:
         self._conn = None
         self._session: Optional[str] = None
         self.error = ""
+        self.restore_token = ""
+        self.on_restore_token = on_restore_token
         self._lock = threading.Lock()
+        self._connecting = False
 
     @property
     def connected(self) -> bool:
         return self._conn is not None and self._session is not None
 
-    def connect(self, timeout: float = 90.0) -> bool:
+    def connect(self, timeout: float = 90.0, restore_token: str = "") -> bool:
+        # Do not hold the lock while the compositor shows its dialog: key
+        # injection must be able to report "not ready" immediately instead of
+        # freezing the Qt main thread behind a blocking connect().
         with self._lock:
             if self.connected:
                 return True
-            try:
-                self._connect(timeout)
-                return True
-            except Exception as exc:  # noqa: BLE001
-                self.error = str(exc)
-                log.warning("RemoteDesktop portal failed: %s", exc)
-                self._close()
+            if self._connecting:
                 return False
+            self._connecting = True
+        try:
+            self._connect(timeout, restore_token)
+            return True
+        except Exception as exc:  # noqa: BLE001
+            self.error = str(exc)
+            log.warning("RemoteDesktop portal failed: %s", exc)
+            with self._lock:
+                self._close()
+            return False
+        finally:
+            with self._lock:
+                self._connecting = False
 
-    def _connect(self, timeout: float) -> None:
+    def _connect(self, timeout: float, restore_token: str = "") -> None:
         _, _, _, _, open_conn = _imports()
         conn = open_conn(bus="SESSION")
-        self._conn = conn
+        with self._lock:
+            self._conn = conn
         token = _token("vw_rd")
         results = _request(
             conn, IFACE_REMOTE, "CreateSession", "a{sv}",
@@ -280,19 +402,58 @@ class RemoteDesktopPortal:
         session = results.get("session_handle")
         if not session:
             raise PortalError("no remote desktop session")
-        self._session = session
 
-        _request(
-            conn, IFACE_REMOTE, "SelectDevices", "oa{sv}",
-            (session, {"types": ("u", 1),  # 1 = keyboard
-                       "handle_token": ("s", _token("vw_dev"))}),
-            _token("vw_rd_dev"), timeout=timeout,
-        )
-        _request(
+        options = {
+            "types": ("u", 1),          # 1 = keyboard
+            "persist_mode": ("u", 2),   # 2 = persist until explicitly revoked
+            "handle_token": ("s", _token("vw_dev")),
+        }
+        if restore_token:
+            options["restore_token"] = ("s", restore_token)
+        try:
+            _request(
+                conn, IFACE_REMOTE, "SelectDevices", "oa{sv}",
+                (session, options),
+                _token("vw_rd_dev"), timeout=timeout,
+            )
+        except PortalError as exc:
+            if restore_token or "InvalidArgument" not in str(exc):
+                # A rejected restore token means the permission was revoked.
+                # Fail quietly: the caller clears the token and falls back to
+                # wtype or the clipboard instead of opening a dialog at start.
+                raise
+            # Portal version 1 has neither persist_mode nor restore_token.
+            # Retry with the plain keyboard request instead of failing.
+            log.info("RemoteDesktop persistence unavailable (%s); retrying without it", exc)
+            _request(
+                conn, IFACE_REMOTE, "SelectDevices", "oa{sv}",
+                (session, {"types": ("u", 1),
+                           "handle_token": ("s", _token("vw_dev"))}),
+                _token("vw_rd_dev2"), timeout=timeout,
+            )
+
+        start_results = _request(
             conn, IFACE_REMOTE, "Start", "osa{sv}",
             (session, "", {"handle_token": ("s", _token("vw_start"))}),
             _token("vw_rd_start"), timeout=timeout,
         )
+        # Only now is the keyboard really usable. Until Start() succeeded the
+        # permission dialog may still be open, so connected must stay False.
+        with self._lock:
+            if self._conn is not conn:
+                raise PortalError("connection closed during setup")
+            self._session = session
+
+        fresh = start_results.get("restore_token")
+        if isinstance(fresh, tuple):
+            fresh = fresh[1]
+        if fresh:
+            self.restore_token = str(fresh)
+            if self.on_restore_token is not None:
+                try:
+                    self.on_restore_token(self.restore_token)
+                except Exception:  # noqa: BLE001
+                    log.exception("Could not store the portal restore token")
 
     def key(self, keycode: int, pressed: bool) -> bool:
         if not self.connected:
@@ -303,7 +464,23 @@ class RemoteDesktopPortal:
                 _addr(IFACE_REMOTE), "NotifyKeyboardKeycode", "oa{sv}iu",
                 (self._session, {}, keycode, 1 if pressed else 0),
             )
-            self._conn.send(msg)
+            # Never block the UI thread behind another portal call. A short
+            # timeout degrades to wtype/clipboard instead of freezing.
+            if not self._lock.acquire(timeout=0.25):
+                log.debug("Portal is busy; skipping key injection")
+                return False
+            try:
+                if self._conn is None:
+                    return False
+                reply = self._conn.send_and_get_reply(msg, timeout=2.0)
+            finally:
+                self._lock.release()
+            from jeepney import MessageType
+            if getattr(reply.header, "message_type", None) == MessageType.error:
+                # The permission was revoked or the session expired. Report
+                # failure so the caller can fall back to wtype/clipboard.
+                log.info("Portal key injection rejected: %s", reply.body)
+                return False
             return True
         except Exception as exc:  # noqa: BLE001
             log.debug("Portal key injection failed: %s", exc)

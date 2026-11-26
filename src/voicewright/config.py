@@ -24,6 +24,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "version": SCHEMA_VERSION,
     "ui_language": "auto",            # auto | de | en
     "first_run_done": False,
+    "onboarding_done": False,         # four-step setup assistant completed
     # --- Hotkey -----------------------------------------------------------
     "hotkey": "ctrl+shift+space",
     "hotkey_mode": "hybrid",          # hybrid | toggle | hold
@@ -108,6 +109,10 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "stats_enabled": True,
     # --- Consent ----------------------------------------------------------
     "wayland_consent": False,         # user agreed to portal keyboard control
+    # Restore token returned by RemoteDesktop.Start(). It lets the portal
+    # re-open the keyboard session without another dialog. The portal
+    # invalidates a token after one use and returns a fresh one.
+    "wayland_restore_token": "",
 }
 
 # Keys that exist in v1 but must keep a place in the v2 UI. Kept as a documented
@@ -163,6 +168,9 @@ def migrate(data: dict[str, Any]) -> dict[str, Any]:
         if data.get("hotkey_mode") not in ("toggle", "hold", "hybrid"):
             data["hotkey_mode"] = "hybrid"
         data.setdefault("cleanup_enabled", False)
+        # Existing users already completed the old first-run flow; never show
+        # the new setup assistant uninvited.
+        data.setdefault("onboarding_done", bool(data.get("first_run_done", False)))
         data["version"] = 2
 
     if data.get("speech_model"):
@@ -195,6 +203,12 @@ def migrate(data: dict[str, Any]) -> dict[str, Any]:
         data["snippets"] = []
     if not isinstance(data.get("replacements"), dict):
         data["replacements"] = {}
+    if not isinstance(data.get("wayland_restore_token"), str):
+        data["wayland_restore_token"] = ""
+    # Anyone who already finished the old first-run flow must not see the new
+    # assistant uninvited, even if the config was written by an early 2.0 build.
+    data.setdefault("onboarding_done", bool(data.get("first_run_done", False)))
+    data["onboarding_done"] = bool(data["onboarding_done"])
     data["version"] = SCHEMA_VERSION
     return data
 

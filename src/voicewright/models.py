@@ -354,6 +354,38 @@ def recommended_model(cuda: bool = False, sherpa: bool = False) -> str:
     return "whisper-small"
 
 
+def is_runnable(model_id: str, sherpa: bool) -> bool:
+    """True when the model's engine is installed on this machine."""
+    model = ALL_BY_ID.get(model_id)
+    if model is None:
+        return False
+    return model.engine != "sherpa-onnx" or sherpa
+
+
+def ensure_runnable_default(config, sherpa: bool, cuda: bool = False) -> str:
+    """Pick a model that can actually run and store it when the old one cannot.
+
+    A fresh install defaults to Parakeet. If the sherpa-onnx wheel is missing
+    (unsupported architecture, stripped bundle) the app must not fail with
+    ``SHERPA_MISSING`` on the very first dictation. Prefer an already
+    downloaded, runnable model; otherwise fall back to the recommended Whisper
+    model, which the user can download in the setup assistant.
+    """
+    current = config.get("speech_model")
+    runnable = [
+        m.id for m in CATALOG
+        if is_downloaded(m.id) and is_runnable(m.id, sherpa)
+    ]
+    if current in runnable:
+        return current
+    recommended = recommended_model(cuda=cuda, sherpa=sherpa)
+    chosen = recommended if recommended in runnable or not runnable else runnable[0]
+    if chosen != current:
+        log.info("Switching speech model from %s to runnable default %s", current, chosen)
+        config.set("speech_model", chosen)
+    return chosen
+
+
 def _sha256(path: Path) -> str:
     h = hashlib.sha256()
     with open(path, "rb") as fh:

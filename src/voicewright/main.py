@@ -14,6 +14,57 @@ from voicewright.paths import logs_dir
 COMMANDS = ("toggle", "start", "stop", "cancel", "transform", "show", "quit")
 
 
+def _qt_platform() -> str:
+    """Pick the Qt platform plugin for this session.
+
+    On Wayland prefer the native plugin and keep XWayland as a fallback, so
+    the clipboard still works in X11 applications. A pure X11 session gets
+    ``xcb``. An explicit ``QT_QPA_PLATFORM`` always wins, which keeps the
+    headless tests and ``smoke-linux.sh`` reproducible.
+    """
+    if os.environ.get("QT_QPA_PLATFORM"):
+        return ""
+    if not sys.platform.startswith("linux"):
+        return ""
+    if os.environ.get("WAYLAND_DISPLAY"):
+        return "wayland;xcb" if os.environ.get("DISPLAY") else "wayland"
+    if os.environ.get("DISPLAY"):
+        return "xcb"
+    return ""
+
+
+def _selftest() -> int:
+    """Hidden smoke test for the packaged Windows/macOS executable.
+
+    It creates a real ``QApplication`` and imports every module the GUI needs.
+    No window is shown, no model is loaded and no microphone is opened.
+    """
+    platform = _qt_platform()
+    if platform:
+        os.environ.setdefault("QT_QPA_PLATFORM", platform)
+    from PySide6.QtWidgets import QApplication
+
+    app = QApplication.instance() or QApplication(sys.argv[:1])  # noqa: F841
+    from voicewright import engines, inject, models, portals  # noqa: F401
+    from voicewright.app import Controller  # noqa: F401
+    from voicewright.config import Config
+    from voicewright.ui import onboarding, settings_window, theme  # noqa: F401
+
+    import faster_whisper  # noqa: F401
+
+    config = Config()
+    theme.set_active(theme.resolve(config.get("theme", "system")))
+    assert config.get("speech_model")
+    assert models.ALL_MODELS
+    # sherpa-onnx is a default dependency, but a platform without a wheel must
+    # still work through the Whisper fallback. Report, do not fail.
+    sherpa = engines.sherpa_available()
+    if sys.stdout is not None:  # windowed builds have no console
+        print(f"{APP_NAME} {__version__} self-test OK "
+              f"(sherpa-onnx: {'yes' if sherpa else 'no, Whisper fallback'})")
+    return 0
+
+
 def _setup_logging(debug: bool) -> None:
     level = logging.DEBUG if debug else logging.INFO
     fmt = logging.Formatter("%(asctime)s %(levelname)-7s %(name)s: %(message)s")
@@ -58,8 +109,21 @@ def main(argv: list[str] | None = None) -> int:
                            help=f"send '{c}' to the running instance")
     parser.add_argument("--minimized", action="store_true", help="start in the tray")
     parser.add_argument("--debug", action="store_true", help="verbose logging")
+    parser.add_argument("--selftest", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--version", action="version", version=f"{APP_NAME} {__version__}")
     args = parser.parse_args(argv)
+
+    if args.selftest:
+        try:
+            return _selftest()
+        except Exception:  # noqa: BLE001
+            # A windowed build has no console. Returning a non-zero exit code
+            # is what the CI smoke test checks; never block on an error dialog.
+            import traceback
+
+            if sys.stderr is not None:
+                traceback.print_exc()
+            return 1
 
     # Single instance: forward CLI commands to an already running process
     # (done before creating the GUI so `voicewright --toggle` is instant).
@@ -69,10 +133,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{APP_NAME} is not running.", file=sys.stderr)
         return 1
 
-    if sys.platform.startswith("linux") and os.environ.get("DISPLAY"):
-        # XWayland bridges the clipboard even when dictation was started by
-        # a desktop shortcut while another application had keyboard focus.
-        os.environ.setdefault("QT_QPA_PLATFORM", "xcb")
+    platform = _qt_platform()
+    if platform:
+        os.environ["QT_QPA_PLATFORM"] = platform
 
     from PySide6.QtCore import Qt
     from PySide6.QtNetwork import QLocalServer

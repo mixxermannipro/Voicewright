@@ -29,6 +29,20 @@ log = logging.getLogger(__name__)
 _BINARY_NAMES = ("llama-server", "llama-server.exe")
 
 
+def _spawn_options(windows: bool | None = None) -> dict:
+    """Popen options that keep the helper server invisible and detached.
+
+    On Windows the bundled ``llama-server.exe`` must never flash a console
+    window. On POSIX a new session keeps the server alive when the launcher
+    exits, and lets us terminate the whole process group.
+    """
+    if windows is None:
+        windows = sys.platform.startswith("win")
+    if windows:
+        return {"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)}
+    return {"start_new_session": True}
+
+
 class RuntimeError_(Exception):
     pass
 
@@ -147,7 +161,7 @@ class LocalRuntime:
                     stdout=open(logfile, "ab"),
                     stderr=subprocess.STDOUT,
                     stdin=subprocess.DEVNULL,
-                    start_new_session=True,
+                    **_spawn_options(),
                 )
             except OSError as exc:
                 raise RuntimeError_(f"Could not start llama-server: {exc}") from exc

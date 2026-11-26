@@ -155,10 +155,14 @@ class ComboDetector:
 class PynputBackend:
     name = "pynput"
 
-    def __init__(self, detector: ComboDetector) -> None:
+    def __init__(self, detector: ComboDetector | list[ComboDetector]) -> None:
         from pynput import keyboard  # type: ignore
         self._kb = keyboard
-        self.detector = detector
+        # One listener feeds every detector (dictation and transform). Each
+        # detector ignores shortcuts that carry extra modifiers, so the two
+        # combinations cannot fire each other.
+        self.detectors = detector if isinstance(detector, list) else [detector]
+        self.detector = self.detectors[0]
         self._listener = None
 
     def _key_name(self, key) -> Optional[str]:
@@ -192,10 +196,17 @@ class PynputBackend:
         return None
 
     def start(self) -> None:
-        self._listener = self._kb.Listener(
-            on_press=lambda k: self.detector.press(self._key_name(k)),
-            on_release=lambda k: self.detector.release(self._key_name(k)),
-        )
+        def press(key) -> None:
+            name = self._key_name(key)
+            for detector in self.detectors:
+                detector.press(name)
+
+        def release(key) -> None:
+            name = self._key_name(key)
+            for detector in self.detectors:
+                detector.release(name)
+
+        self._listener = self._kb.Listener(on_press=press, on_release=release)
         self._listener.daemon = True
         self._listener.start()
 
@@ -208,8 +219,9 @@ class PynputBackend:
 class NullBackend:
     name = "none"
 
-    def __init__(self, detector: ComboDetector) -> None:
-        self.detector = detector
+    def __init__(self, detector: ComboDetector | list[ComboDetector]) -> None:
+        self.detectors = detector if isinstance(detector, list) else [detector]
+        self.detector = self.detectors[0]
 
     def start(self) -> None:
         pass
@@ -221,31 +233,70 @@ class NullBackend:
 # ---------------------------------------------------------------------------
 # Wayland portal backend
 # ---------------------------------------------------------------------------
+_XDG_KEYS = {
+    "space": "space", "enter": "Return", "tab": "Tab", "esc": "Escape",
+    "backspace": "BackSpace", "insert": "Insert", "delete": "Delete",
+    "home": "Home", "end": "End", "page_up": "Page_Up", "page_down": "Page_Down",
+    "up": "Up", "down": "Down", "left": "Left", "right": "Right",
+    "pause": "Pause", "scroll_lock": "Scroll_Lock", "caps_lock": "Caps_Lock",
+    "print_screen": "Print",
+}
+
+
 def portal_trigger(hotkey: str) -> str:
-    """Convert 'ctrl+shift+space' into the accelerator the portal expects."""
+    """Convert 'ctrl+shift+space' into the XDG shortcuts accelerator.
+
+    The GlobalShortcuts portal parses ``preferred_trigger`` with the XDG
+    shortcuts specification: modifiers are upper case (``CTRL``, ``SHIFT``,
+    ``ALT``, ``LOGO``), keys keep their XKB names (``a``, ``space``,
+    ``Return``, ``F5``). Sending ``SPACE`` instead makes GTK reject the
+    trigger and the compositor silently picks another shortcut.
+    """
     keys = parse_hotkey(hotkey)
     order = [m for m in MODIFIERS if m in keys]
     rest = sorted(k for k in keys if k not in MODIFIERS)
     names = {"ctrl": "CTRL", "shift": "SHIFT", "alt": "ALT", "cmd": "LOGO"}
-    return "+".join([names[m] for m in order] + [k.upper() if len(k) == 1 else k.upper()
-                                                 for k in rest])
+    rendered = [_XDG_KEYS.get(k, k.upper() if k.startswith("f") and k[1:].isdigit()
+                              else k) for k in rest]
+    return "+".join([names[m] for m in order] + rendered)
 
 
 class PortalBackend:
-    """Global shortcut through org.freedesktop.portal.GlobalShortcuts."""
+    """Global shortcuts through org.freedesktop.portal.GlobalShortcuts.
+
+    One portal session carries both the dictation and the rewrite shortcut.
+    Opening two sessions would ask the user twice and is rejected by some
+    compositors.
+    """
 
     name = "portal"
 
-    def __init__(self, detector: ComboDetector) -> None:
+    def __init__(self, detector: ComboDetector | dict[str, ComboDetector]) -> None:
         from voicewright.portals import GlobalShortcutsPortal
-        self.detector = detector
+        if isinstance(detector, dict):
+            self.detectors = detector
+        else:
+            self.detectors = {"dictate": detector}
+        self.detector = next(iter(self.detectors.values()))
         self._portal = GlobalShortcutsPortal(
-            on_press=detector.press_portal,
-            on_release=detector.release_portal,
+            on_press=self._press,
+            on_release=self._release,
         )
 
-    def start(self, hotkey: str) -> bool:
-        return self._portal.start(trigger=portal_trigger(hotkey))
+    def _press(self, shortcut_id: str) -> None:
+        detector = self.detectors.get(shortcut_id)
+        if detector is not None:
+            detector.press_portal()
+
+    def _release(self, shortcut_id: str) -> None:
+        detector = self.detectors.get(shortcut_id)
+        if detector is not None:
+            detector.release_portal()
+
+    def start(self, shortcuts) -> bool:
+        if isinstance(shortcuts, str):
+            shortcuts = [("dictate", "Dictate", shortcuts)]
+        return self._portal.start(shortcuts)
 
     def stop(self) -> None:
         self._portal.stop()
@@ -256,47 +307,89 @@ class PortalBackend:
 
 
 # ---------------------------------------------------------------------------
+def combos_conflict(a: frozenset[str], b: frozenset[str]) -> bool:
+    """True if two combinations can fire at the same moment.
+
+    The detector fires a combo as soon as all its keys are held. If one combo
+    is a subset or superset of the other, pressing the larger one also fires
+    the smaller one — e.g. a modifier-only rewrite shortcut would fire while
+    the user holds the dictation prefix.
+    """
+    return bool(a) and bool(b) and (a <= b or b <= a)
+
+
 class HotkeyManager:
     def __init__(self) -> None:
         self.detector = ComboDetector()
+        self.transform_detector = ComboDetector()
         self.backend = None
         self.error = ""
 
-    def start(self, hotkey: str, backend: str = "auto", wayland: str = "portal") -> str:
-        """Start listening. Returns the backend name actually used."""
+    def start(self, hotkey: str, backend: str = "auto", wayland: str = "portal",
+              transform_hotkey: str = "") -> str:
+        """Start listening. Returns the backend name actually used.
+
+        ``transform_hotkey`` is optional. When set, both shortcuts share one
+        listener (pynput) or one portal session (Wayland).
+        """
         self.stop()
         self.error = ""
         self.detector.set_combo(parse_hotkey(hotkey))
+        try:
+            transform = parse_hotkey(transform_hotkey) if transform_hotkey else frozenset()
+        except ValueError as exc:
+            # A broken rewrite shortcut must never disable dictation.
+            log.warning("Ignoring invalid transform shortcut %r: %s", transform_hotkey, exc)
+            transform = frozenset()
+        if combos_conflict(transform, self.detector.combo):
+            # Two overlapping combinations cannot mean two things: pressing
+            # the larger one would fire both actions. Keep the rewrite
+            # shortcut off instead.
+            log.warning("Transform shortcut overlaps the dictation shortcut; disabled")
+            transform = frozenset()
+        self.transform_detector.set_combo(transform)
+
+        detectors = {"dictate": self.detector, "transform": self.transform_detector}
 
         if IS_LINUX and session_type() == "wayland":
             if wayland == "portal" and backend != "none":
-                portal = PortalBackend(self.detector)
-                if portal.start(hotkey):
+                shortcuts = [("dictate", "Dictate", portal_trigger(hotkey))]
+                if transform:
+                    shortcuts.append(("transform", "Rewrite selection",
+                                       portal_trigger(transform_hotkey)))
+                portal = PortalBackend(detectors)
+                if portal.start(shortcuts):
                     self.backend = portal
                     return "portal"
                 self.error = "PORTAL_UNAVAILABLE"
                 log.info("GlobalShortcuts portal unavailable: %s", portal.error)
             else:
                 self.error = "WAYLAND_DESKTOP_SHORTCUT"
-            self.backend = NullBackend(self.detector)
+            self.backend = NullBackend(list(detectors.values()))
             return "none"
 
         if backend == "none":
-            self.backend = NullBackend(self.detector)
+            self.backend = NullBackend(list(detectors.values()))
             return "none"
         try:
-            listener = PynputBackend(self.detector)
+            listener = PynputBackend(list(detectors.values()))
             listener.start()
         except Exception:
             self.error = "HOTKEY_UNAVAILABLE"
             log.warning("Global shortcut backend unavailable")
-            self.backend = NullBackend(self.detector)
+            self.backend = NullBackend(list(detectors.values()))
             return "none"
         self.backend = listener
         return "pynput"
 
-    def update_combo(self, hotkey: str) -> None:
+    def update_combo(self, hotkey: str, transform_hotkey: str = "") -> None:
         self.detector.set_combo(parse_hotkey(hotkey))
+        try:
+            transform = parse_hotkey(transform_hotkey) if transform_hotkey else frozenset()
+        except ValueError:
+            transform = frozenset()
+        self.transform_detector.set_combo(
+            frozenset() if combos_conflict(transform, self.detector.combo) else transform)
 
     def stop(self) -> None:
         if self.backend is not None:

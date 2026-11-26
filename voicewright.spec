@@ -20,6 +20,16 @@ hiddenimports = (
     + ["voicewright.main", "voicewright.app"]
 )
 
+# Parakeet and SenseVoice run through sherpa-onnx. The package is a default
+# dependency, but keep the bundle buildable on platforms without a wheel.
+try:
+    import sherpa_onnx  # noqa: F401
+    datas += collect_data_files("sherpa_onnx")
+    binaries += collect_dynamic_libs("sherpa_onnx")
+    hiddenimports += collect_submodules("sherpa_onnx")
+except Exception:
+    pass
+
 if sys.platform in ("win32", "darwin"):
     datas += collect_data_files("_sounddevice_data")   # bundled PortAudio
 

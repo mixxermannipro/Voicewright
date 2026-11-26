@@ -8,19 +8,23 @@ version = "2.0.0"
 description = "Local-first voice dictation: offline Parakeet/Whisper transcription, local LLM or rule-based cleanup, inserted at your cursor."
 readme = "README.md"
 license = { text = "MIT" }
-requires-python = ">=3.10"
+requires-python = ">=3.11,<3.15"
 dependencies = [
   "PySide6-Essentials==6.11.2",
   "faster-whisper>=1.1.0",
+  "av>=16,<19",  # PyAV 19 removed metadata_errors, which faster-whisper uses
+  "sherpa-onnx>=2.0.0,<3.0",
   "sounddevice>=0.4.6",
-  "numpy>=1.24",
+  "numpy>=1.24,<2.5",
   "pynput>=1.8.1",
   "keyring>=24.0",
   "jeepney>=0.8.0; sys_platform == 'linux'",
 ]
 
 [project.optional-dependencies]
-asr = ["sherpa-onnx>=1.10"]
+# Kept for users who intentionally install a minimal core; sherpa-onnx is
+# part of the default dependencies since 2.0.0 so Parakeet works out of the box.
+asr = ["sherpa-onnx>=2.0.0,<3.0"]
 x11 = ["python-xlib>=0.33"]
 dev = ["pyinstaller>=6.6", "pytest>=8", "pillow>=10"]
 

@@ -1,8 +1,10 @@
-; Inno Setup script – built by the GitHub workflow:
-; ISCC /DAppVersion=1.0.0 /DSourceDir=dist\Voicewright /DOutputDir=release voicewright.iss
+; Inno Setup script – built by scripts\build.bat and the GitHub workflow.
+; Both pass absolute paths, because ISCC resolves /D paths relative to this
+; script's folder: ISCC "/DAppVersion=2.0.0" "/DSourceDir=%CD%\dist\Voicewright"
+; "/DOutputDir=%CD%\release" voicewright.iss
 
 #ifndef AppVersion
-  #define AppVersion "1.0.0"
+  #define AppVersion "2.0.0"
 #endif
 #ifndef SourceDir
   #define SourceDir "..\..\dist\Voicewright"

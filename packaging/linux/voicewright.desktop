@@ -11,9 +11,15 @@ Terminal=false
 Categories=Utility;Accessibility;AudioVideo;
 Keywords=dictation;speech;whisper;voice;transcription;diktat;sprache;
 StartupNotify=false
-Actions=Toggle;
+StartupWMClass=voicewright
+Actions=Toggle;Transform;
 
 [Desktop Action Toggle]
 Name=Start/Stop dictation
 Name[de]=Diktat starten/beenden
 Exec=voicewright --toggle
+
+[Desktop Action Transform]
+Name=Rewrite selection
+Name[de]=Auswahl umschreiben
+Exec=voicewright --transform
