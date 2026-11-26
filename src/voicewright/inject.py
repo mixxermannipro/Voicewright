@@ -18,6 +18,7 @@ import logging
 import shutil
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from typing import Optional
 
@@ -45,7 +46,7 @@ def _run(cmd: list[str], text: Optional[str] = None, timeout: float = 8.0) -> bo
     if not shutil.which(cmd[0]):
         return False
     try:
-        subprocess.run(
+        result = subprocess.run(
             cmd,
             input=text.encode("utf-8") if text is not None else None,
             stdout=subprocess.DEVNULL,
@@ -53,6 +54,9 @@ def _run(cmd: list[str], text: Optional[str] = None, timeout: float = 8.0) -> bo
             timeout=timeout,
             check=False,
         )
+        if result.returncode != 0:
+            log.debug("Command %s exited with %s", cmd[0], result.returncode)
+            return False
         return True
     except (OSError, subprocess.SubprocessError) as exc:
         log.debug("Command %s failed: %s", cmd[0], exc)
@@ -62,56 +66,127 @@ def _run(cmd: list[str], text: Optional[str] = None, timeout: float = 8.0) -> bo
 # ---------------------------------------------------------------------------
 # Windows – SendInput
 # ---------------------------------------------------------------------------
-def _windows_send(vk: int, down: bool, scan: int = 0, unicode_char: Optional[str] = None) -> None:
-    from ctypes import wintypes
+# Win32 types with fixed widths. ``ctypes.wintypes`` maps LONG/DWORD to the
+# host C types, which are 64-bit on Linux; building the structures with
+# explicit 16/32/64-bit fields keeps the layout correct on every host and
+# makes the size testable without Windows.
+_WORD = ctypes.c_uint16
+_DWORD = ctypes.c_uint32
+_LONG = ctypes.c_int32
+_ULONG_PTR = ctypes.c_uint64 if ctypes.sizeof(ctypes.c_void_p) == 8 else ctypes.c_uint32
 
-    KEYEVENTF_KEYUP = 0x0002
-    KEYEVENTF_UNICODE = 0x0004
-    INPUT_KEYBOARD = 1
+KEYEVENTF_KEYUP = 0x0002
+KEYEVENTF_UNICODE = 0x0004
+INPUT_KEYBOARD = 1
 
-    class KEYBDINPUT(ctypes.Structure):
-        _fields_ = [
-            ("wVk", wintypes.WORD),
-            ("wScan", wintypes.WORD),
-            ("dwFlags", wintypes.DWORD),
-            ("time", wintypes.DWORD),
-            ("dwExtraInfo", ctypes.POINTER(ctypes.c_ulong)),
-        ]
 
-    class _INPUTUNION(ctypes.Union):
-        _fields_ = [("ki", KEYBDINPUT)]
+class _MOUSEINPUT(ctypes.Structure):
+    _fields_ = [
+        ("dx", _LONG),
+        ("dy", _LONG),
+        ("mouseData", _DWORD),
+        ("dwFlags", _DWORD),
+        ("time", _DWORD),
+        ("dwExtraInfo", _ULONG_PTR),
+    ]
 
-    class INPUT(ctypes.Structure):
-        _fields_ = [("type", wintypes.DWORD), ("union", _INPUTUNION)]
 
-    flags = 0
-    if not down:
-        flags |= KEYEVENTF_KEYUP
-    if unicode_char is not None:
+class _KEYBDINPUT(ctypes.Structure):
+    _fields_ = [
+        ("wVk", _WORD),
+        ("wScan", _WORD),
+        ("dwFlags", _DWORD),
+        ("time", _DWORD),
+        ("dwExtraInfo", _ULONG_PTR),
+    ]
+
+
+class _HARDWAREINPUT(ctypes.Structure):
+    _fields_ = [
+        ("uMsg", _DWORD),
+        ("wParamL", _WORD),
+        ("wParamH", _WORD),
+    ]
+
+
+class _INPUTUNION(ctypes.Union):
+    _fields_ = [("mi", _MOUSEINPUT), ("ki", _KEYBDINPUT), ("hi", _HARDWAREINPUT)]
+
+
+class _INPUT(ctypes.Structure):
+    _fields_ = [("type", _DWORD), ("union", _INPUTUNION)]
+
+
+def _windows_structs():
+    """Expose the structures for the size/layout regression test."""
+    return _KEYBDINPUT, _INPUT
+
+
+_user32 = None
+
+
+def _get_user32():
+    global _user32
+    if _user32 is None:
+        user32 = ctypes.WinDLL("user32", use_last_error=True)  # type: ignore[attr-defined]
+        user32.SendInput.argtypes = (ctypes.c_uint, ctypes.POINTER(_INPUT), ctypes.c_int)
+        user32.SendInput.restype = ctypes.c_uint
+        _user32 = user32
+    return _user32
+
+
+def _utf16_units(text: str) -> list[int]:
+    """UTF-16 code units, so emoji and other astral characters work."""
+    raw = text.encode("utf-16-le")
+    return [int.from_bytes(raw[i:i + 2], "little") for i in range(0, len(raw), 2)]
+
+
+def _windows_send(vk: int, down: bool, scan: int = 0, unicode_char: Optional[str] = None,
+                  unicode_unit: Optional[int] = None) -> bool:
+    flags = 0 if down else KEYEVENTF_KEYUP
+    if unicode_char is not None or unicode_unit is not None:
         flags |= KEYEVENTF_UNICODE
         vk = 0
-        scan = ord(unicode_char)
-    item = INPUT(type=INPUT_KEYBOARD)
-    item.union.ki = KEYBDINPUT(wVk=vk, wScan=scan, dwFlags=flags, time=0, dwExtraInfo=None)
-    user32 = ctypes.windll.user32
-    user32.SendInput(1, ctypes.byref(item), ctypes.sizeof(INPUT))
+        scan = unicode_unit if unicode_unit is not None else ord(unicode_char or "")
+    item = _INPUT(type=INPUT_KEYBOARD)
+    item.union.ki = _KEYBDINPUT(wVk=vk, wScan=scan, dwFlags=flags, time=0, dwExtraInfo=0)
+    sent = _get_user32().SendInput(1, ctypes.byref(item), ctypes.sizeof(_INPUT))
+    if sent != 1:
+        raise OSError(ctypes.get_last_error(), "SendInput failed")
+    return True
 
 
 def _windows_paste(ctrl_shift: bool = False, key: str = "v") -> bool:
     VK_CONTROL, VK_SHIFT = 0x11, 0x10
     VK_KEY = ord(key.upper())
+    pressed: list[int] = []
     try:
         _windows_send(VK_CONTROL, True)
+        pressed.append(VK_CONTROL)
+        time.sleep(0.01)
         if ctrl_shift:
             _windows_send(VK_SHIFT, True)
+            pressed.append(VK_SHIFT)
+            time.sleep(0.01)
         _windows_send(VK_KEY, True)
+        pressed.append(VK_KEY)
+        time.sleep(0.01)
         _windows_send(VK_KEY, False)
+        pressed.remove(VK_KEY)
         if ctrl_shift:
             _windows_send(VK_SHIFT, False)
+            pressed.remove(VK_SHIFT)
         _windows_send(VK_CONTROL, False)
+        pressed.remove(VK_CONTROL)
         return True
     except Exception as exc:  # noqa: BLE001
         log.debug("SendInput paste failed: %s", exc)
+        # Never leave Ctrl or Shift held down after a partial sequence.
+        for vk in reversed(pressed):
+            try:
+                _windows_send(vk, False)
+            except Exception:  # noqa: BLE001
+                pass
         return False
 
 
@@ -125,8 +200,13 @@ def _windows_type(text: str) -> bool:
                 _windows_send(0x09, True)
                 _windows_send(0x09, False)
             else:
-                _windows_send(0, True, unicode_char=ch)
-                _windows_send(0, False, unicode_char=ch)
+                # A surrogate pair (emoji, rare scripts) must go down as one
+                # pair and up again; keyup between the halves produces garbage.
+                units = _utf16_units(ch)
+                for unit in units:
+                    _windows_send(0, True, unicode_unit=unit)
+                for unit in reversed(units):
+                    _windows_send(0, False, unicode_unit=unit)
         return True
     except Exception as exc:  # noqa: BLE001
         log.debug("SendInput type failed: %s", exc)

@@ -13,14 +13,16 @@ from voicewright.audio import SAMPLE_RATE, AudioError, Recorder, play_sound, tri
 from voicewright.cleanup import Cleaner, CleanupResult
 from voicewright.config import Config
 from voicewright.dictation import DictationMachine
+from voicewright.engines import cuda_available, sherpa_available
 from voicewright.history import History
 from voicewright.hotkey import HotkeyManager, format_hotkey
 from voicewright.i18n import tr
 from voicewright.injector import Injector
-from voicewright.models import downloaded_models, is_downloaded
+from voicewright.models import downloaded_models, ensure_runnable_default, is_downloaded
 from voicewright.paths import resource_path, session_type
 from voicewright.stats import Stats
 from voicewright.transcriber import Transcriber
+from voicewright.ui.onboarding import OnboardingWizard
 from voicewright.ui.overlay import Overlay
 from voicewright.ui.settings_window import SettingsWindow
 from voicewright.ui.tasks import run_task
@@ -33,6 +35,7 @@ class _HotkeyBridge(QObject):
     activated = Signal()
     deactivated = Signal()
     escape = Signal()
+    transform = Signal()
     level = Signal(float)
 
 
@@ -66,6 +69,7 @@ class Controller(QObject):
         self.stats = Stats()
         self.transcriber = Transcriber(config)
         self.cleaner = Cleaner(config)
+        self.onboarding = None
 
         self.machine = DictationMachine(
             mode=config.get("hotkey_mode", "hybrid"),
@@ -80,12 +84,15 @@ class Controller(QObject):
         self.bridge.activated.connect(self.on_hotkey_down)
         self.bridge.deactivated.connect(self.on_hotkey_up)
         self.bridge.escape.connect(self.on_escape)
+        self.bridge.transform.connect(self.transform_selection)
 
         self.recorder = Recorder(level_callback=self.bridge.level.emit)
         self.hotkeys = HotkeyManager()
+        self._hotkey_backend = ""
         self.hotkeys.detector.on_activate = self.bridge.activated.emit
         self.hotkeys.detector.on_deactivate = self.bridge.deactivated.emit
         self.hotkeys.detector.on_escape = self.bridge.escape.emit
+        self.hotkeys.transform_detector.on_activate = self.bridge.transform.emit
 
         self.injector = Injector(config)
         self.injector.finished.connect(self._on_inserted)
@@ -111,6 +118,7 @@ class Controller(QObject):
         self.settings.cleanupChanged.connect(self._on_cleanup_changed)
         self.settings.outputChanged.connect(self._on_output_changed)
         self.settings.waylandPermissionRequested.connect(self.request_wayland_permission)
+        self.settings.onboardingRequested.connect(self.show_onboarding)
         self.settings.dictation_button.clicked.connect(self.toggle)
 
         self._build_tray()
@@ -134,6 +142,9 @@ class Controller(QObject):
             mode_menu.addAction(a)
             a.triggered.connect(lambda _=False, mode=m: self._set_mode(mode))
         self._sync_mode_actions()
+        act_setup = QAction(tr("Setup assistant…"), menu)
+        act_setup.triggered.connect(lambda: self.show_onboarding(0))
+        menu.addAction(act_setup)
         act_settings = QAction(tr("Settings…"), menu)
         act_settings.triggered.connect(lambda: self.show_settings())
         menu.addAction(act_settings)
@@ -176,18 +187,76 @@ class Controller(QObject):
         self.settings.dictation_button.setEnabled(self.act_toggle.isEnabled())
 
     def start(self, show_settings: bool = False) -> None:
+        ensure_runnable_default(
+            self.config,
+            sherpa=sherpa_available(),
+            cuda=cuda_available(),
+        )
         self.restart_hotkeys()
-        if not downloaded_models():
+        showed_onboarding = False
+        if not self.config.get("onboarding_done") and not downloaded_models():
+            self.show_onboarding(0)
+            showed_onboarding = True
+        elif not downloaded_models():
             self.show_settings(tab=1)
             self.settings.set_status(
                 tr("Welcome! Download a speech model to get started (recommended model is marked with ★)."))
         elif show_settings or not self.config.get("start_minimized", True):
             self.show_settings()
-        if not self.config.get("first_run_done"):
+        if not self.config.get("first_run_done") and not showed_onboarding:
+            # While the assistant is open, "running in the tray" would be
+            # misleading; the wizard sets first_run_done when it is finished.
             self.config.set("first_run_done", True)
             self.notify(tr("Voicewright is running in the system tray. Shortcut:") + " "
                         + format_hotkey(self.config.get("hotkey")))
+        if session_type() == "wayland" and self.config.get("wayland_restore_token"):
+            # Re-open the keyboard session in the background; a missing or
+            # revoked token must never delay startup.
+            run_task(self.injector.restore_portal,
+                     on_done=lambda ok: log.info("Wayland portal restored: %s", ok),
+                     on_error=lambda err: log.info("Wayland portal restore skipped: %s", err))
         self._preload_model()
+
+    def show_onboarding(self, step: int = 0) -> None:
+        method = tr(self.injector.describe_method())
+        if self.onboarding is None:
+            self.onboarding = OnboardingWizard(self.config, self.icons["idle"], method)
+            self.onboarding.completed.connect(self._on_onboarding_finished)
+            self.onboarding.hotkeyChanged.connect(self._on_onboarding_hotkey_changed)
+            self.onboarding.insertionTestRequested.connect(self.injector.insert)
+        else:
+            self.onboarding.method_label.setText(method)
+        self.onboarding.show_step(step)
+        self.onboarding.show()
+        self.onboarding.raise_()
+        self.onboarding.activateWindow()
+
+    @Slot()
+    def _on_onboarding_hotkey_changed(self) -> None:
+        """Apply a shortcut edited inside the assistant right away.
+
+        The Wayland portal is the exception: rebinding there can show a new
+        permission dialog for every key press, so the finish step rebinds it
+        once instead.
+        """
+        if self._hotkey_backend == "portal":
+            return
+        self._on_hotkey_config_changed()
+
+    @Slot()
+    def _on_onboarding_finished(self) -> None:
+        self.config.set("first_run_done", True)
+        self.settings.refresh_overview()
+        self.settings._refresh_models()
+        self.restart_hotkeys()
+        self._preload_model()
+        if is_downloaded(self.config.get("speech_model")):
+            self.notify(tr("Setup complete. Voicewright is ready."))
+        else:
+            # Finishing the assistant without a model is allowed, but the app
+            # is not usable yet. Send the user straight to the model page
+            # instead of claiming everything is ready.
+            self.show_settings(tab=1)
 
     def _preload_model(self) -> None:
         if is_downloaded(self.config.get("speech_model")) and self.config.get("keep_model_loaded", True):
@@ -200,10 +269,12 @@ class Controller(QObject):
                 self.config.get("hotkey"),
                 self.config.get("hotkey_backend", "auto"),
                 wayland=self.config.get("wayland_hotkey", "portal"),
+                transform_hotkey=self.config.get("transform_hotkey", ""),
             )
         except ValueError as exc:
             self.notify(tr("Invalid shortcut:") + f" {exc}", error=True)
             return
+        self._hotkey_backend = used
         msg = ""
         if used == "none" and session_type() == "wayland":
             if self.hotkeys.error == "PORTAL_UNAVAILABLE":
@@ -219,6 +290,7 @@ class Controller(QObject):
     def _set_capture(self, active: bool) -> None:
         self.hotkeys_paused = active
         self.hotkeys.detector.reset()
+        self.hotkeys.transform_detector.reset()
 
     @Slot()
     def _on_hotkey_config_changed(self) -> None:
@@ -242,7 +314,7 @@ class Controller(QObject):
     def _on_output_changed(self) -> None:
         desc = self.injector.describe_method()
         self.settings.refresh_output(desc)
-        self.settings.set_status(desc)
+        self.settings.set_status(tr(desc))
 
     def show_settings(self, tab: int | None = None) -> None:
         if tab is not None:
@@ -459,6 +531,22 @@ class Controller(QObject):
         self._set_state("processing")
         if self.config.get("show_overlay"):
             self.overlay.show_state("processing", tr("Reading selection…"))
+        self._copy_selection_when_ready(time.monotonic())
+
+    def _copy_selection_when_ready(self, started: float) -> None:
+        """Send Ctrl+C only after the shortcut's modifiers are released.
+
+        The rewrite shortcut fires on key press, so Ctrl and Alt are normally
+        still held. Injecting Ctrl+C at that moment reaches the application as
+        Ctrl+Alt+C and copies nothing. Wait for the detector to see the
+        release; portal shortcuts expose no key state, so they get a short
+        fixed grace period and a bounded total wait.
+        """
+        elapsed = time.monotonic() - started
+        still_down = self.hotkeys.transform_detector.modifiers_down()
+        if elapsed < 0.15 or (still_down and elapsed < 0.9):
+            QTimer.singleShot(40, lambda: self._copy_selection_when_ready(started))
+            return
         inject.copy_selection(
             wayland=self.config.get("wayland_inject", "auto"),
             ydotool=bool(self.config.get("ydotool_enabled", False)),
@@ -469,7 +557,13 @@ class Controller(QObject):
     def _after_copy_selection(self) -> None:
         clipboard = QGuiApplication.clipboard()
         selected = clipboard.text() if clipboard is not None else ""
-        if not selected.strip() or selected == self._transform_before:
+        usable = bool(selected.strip()) and selected != self._transform_before
+        # Copying the selection overwrote the user's clipboard. Put the old
+        # content back before insertion saves "previous clipboard" again, so
+        # the rewrite does not destroy what the user had copied earlier.
+        if clipboard is not None:
+            clipboard.setText(self._transform_before)
+        if not usable:
             self._set_state("idle")
             if self.config.get("show_overlay"):
                 self.overlay.show_state("error", tr("No selection detected"), auto_hide_ms=1600)

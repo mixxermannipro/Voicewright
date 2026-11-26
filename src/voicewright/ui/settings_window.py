@@ -21,7 +21,7 @@ from voicewright.cleanup import LANGUAGE_NAMES, PROVIDERS, PROVIDERS_BY_ID, Clea
 from voicewright.config import Config
 from voicewright.engines import cuda_available, sherpa_available
 from voicewright.history import History
-from voicewright.hotkey import format_hotkey
+from voicewright.hotkey import combos_conflict, format_hotkey, parse_hotkey
 from voicewright.i18n import tr
 from voicewright.keystore import get_api_key, set_api_key
 from voicewright.models import (
@@ -77,6 +77,7 @@ class SettingsWindow(QWidget):
     cleanupChanged = Signal()
     outputChanged = Signal()
     waylandPermissionRequested = Signal()
+    onboardingRequested = Signal(int)
 
     def __init__(self, config: Config, history: History, stats: Stats, icon: QIcon) -> None:
         super().__init__()
@@ -233,6 +234,9 @@ class SettingsWindow(QWidget):
         self.dictation_button.setObjectName("Primary")
         self.dictation_button.setCursor(Qt.PointingHandCursor)
         top_row.addWidget(self.dictation_button)
+        btn_setup = QPushButton(tr("Setup assistant…"))
+        btn_setup.clicked.connect(lambda: self.onboardingRequested.emit(0))
+        top_row.addWidget(btn_setup)
         top_row.addStretch(1)
         self.badge_model = widgets.Badge("", accent=True)
         self.badge_hotkey = widgets.Badge("", accent=False)
@@ -326,6 +330,9 @@ class SettingsWindow(QWidget):
         refresh_btn.clicked.connect(self._fill_mics)
         mic_row.addWidget(refresh_btn)
         af.addRow(tr("Input device:"), mic_row)
+        btn_mic_test = QPushButton(tr("Test microphone…"))
+        btn_mic_test.clicked.connect(lambda: self.onboardingRequested.emit(2))
+        af.addRow("", btn_mic_test)
 
         af.addRow(
             tr("Max. recording length:"),
@@ -392,10 +399,39 @@ class SettingsWindow(QWidget):
         self.config.set("hotkey", hk)
         self.refresh_overview()
         self.hotkeyConfigChanged.emit()
+        self._warn_if_overlapping()
 
     def _on_mode_changed(self, mode: str) -> None:
         self.config.set("hotkey_mode", mode)
         self.hotkeyConfigChanged.emit()
+
+    def _on_transform_hotkey(self, hk: str) -> None:
+        self.config.set("transform_hotkey", hk)
+        self.hotkeyConfigChanged.emit()
+        if not self._warn_if_overlapping():
+            self.set_status(tr("Rewrite shortcut saved:") + " " + format_hotkey(hk))
+
+    def _warn_if_overlapping(self) -> bool:
+        """Tell the user when the rewrite shortcut can never fire.
+
+        The manager keeps a conflicting rewrite shortcut off, because pressing
+        the larger combination would otherwise start dictation and rewrite at
+        the same time.
+        """
+        try:
+            conflict = combos_conflict(
+                parse_hotkey(self.config.get("transform_hotkey", "")),
+                parse_hotkey(self.config.get("hotkey")),
+            )
+        except ValueError:
+            return False
+        if not conflict:
+            return False
+        self.set_status(
+            tr("The rewrite shortcut overlaps the dictation shortcut and stays off."),
+            error=True,
+        )
+        return True
 
     def _on_autostart(self, v: bool) -> None:
         try:
@@ -546,6 +582,8 @@ class SettingsWindow(QWidget):
             status = tr("Not downloaded")
             if is_downloaded(m.id):
                 status = tr("Active") if m.id == active else tr("Downloaded")
+            if m.engine == "sherpa-onnx" and not sherpa_available():
+                status = tr("Requires sherpa-onnx")
             vals = [
                 name,
                 m.engine,
@@ -571,8 +609,9 @@ class SettingsWindow(QWidget):
         mid = self._selected_model()
         downloading = self._download_task is not None
         dl = bool(mid and is_downloaded(mid))
-        self.btn_download.setEnabled(bool(mid) and not dl and not downloading)
-        self.btn_use.setEnabled(dl and mid != self.config.get("speech_model"))
+        runnable = bool(mid) and (CATALOG_BY_ID[mid].engine != "sherpa-onnx" or sherpa_available())
+        self.btn_download.setEnabled(bool(mid) and not dl and not downloading and runnable)
+        self.btn_use.setEnabled(dl and mid != self.config.get("speech_model") and runnable)
         self.btn_delete.setEnabled(dl and not downloading)
         if mid:
             m = CATALOG_BY_ID[mid]
@@ -582,6 +621,10 @@ class SettingsWindow(QWidget):
     def _download_selected(self) -> None:
         mid = self._selected_model()
         if not mid:
+            return
+        if CATALOG_BY_ID[mid].engine == "sherpa-onnx" and not sherpa_available():
+            QMessageBox.warning(self, APP_NAME, tr(
+                "This model needs the sherpa-onnx package. Install the 'asr' extra or choose a Whisper model."))
             return
         self.dl_progress.setVisible(True)
         self.dl_progress.setRange(0, 0)
@@ -1168,7 +1211,7 @@ class SettingsWindow(QWidget):
             ),
         )
         self.transform_edit = HotkeyEdit(self.config.get("transform_hotkey", "ctrl+alt+space"))
-        self.transform_edit.hotkeyChanged.connect(lambda hk: self.config.set("transform_hotkey", hk))
+        self.transform_edit.hotkeyChanged.connect(self._on_transform_hotkey)
         self.transform_edit.error.connect(lambda m: QMessageBox.warning(self, APP_NAME, m))
         self.transform_edit.capturingChanged.connect(self.captureActive.emit)
         ff.addRow(tr("Rewrite selection shortcut:"), self.transform_edit)
@@ -1412,10 +1455,12 @@ class SettingsWindow(QWidget):
 
     def refresh_output(self, method: str = "") -> None:
         if method:
-            self.output_method_label.setText(method)
+            self.output_method_label.setText(tr(method))
         consented = bool(self.config.get("wayland_consent", False))
-        self.wayland_consent_badge.setText(tr("Granted") if consented else tr("Not granted"))
-        self.wayland_consent_badge.set_accent(consented)
+        saved = bool(self.config.get("wayland_restore_token", ""))
+        label = tr("Granted (saved)") if saved else (tr("Granted") if consented else tr("Not granted"))
+        self.wayland_consent_badge.setText(label)
+        self.wayland_consent_badge.set_accent(consented or saved)
 
     # ======================================================================
     # Page 5: History & Stats
@@ -1549,6 +1594,9 @@ class SettingsWindow(QWidget):
             tr("Shortcut:") + " " + format_hotkey(self.config.get("hotkey"))
             + " · CLI: <code>voicewright --toggle | --start | --stop | --cancel | --transform</code>"
         ))
+        btn_setup = QPushButton(tr("Open setup assistant"))
+        btn_setup.clicked.connect(lambda: self.onboardingRequested.emit(0))
+        diag_card.body.addWidget(btn_setup)
         lay.addWidget(diag_card)
         lay.addStretch(1)
         return page

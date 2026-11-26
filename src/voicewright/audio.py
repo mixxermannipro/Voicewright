@@ -35,6 +35,11 @@ def list_input_devices() -> list[str]:
     return names
 
 
+def device_index(name: Optional[str]) -> Optional[int]:
+    """Public wrapper used by the setup assistant's level test."""
+    return _device_index(name)
+
+
 def _device_index(name: Optional[str]) -> Optional[int]:
     if not name or sd is None:
         return None

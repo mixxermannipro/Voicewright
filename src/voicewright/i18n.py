@@ -366,6 +366,13 @@ DE: dict[str, str] = {
     "Voicewright pastes or types finished dictations into the active window and always keeps the clipboard as a safety net.":
         "Voicewright fügt fertige Diktate direkt ins aktive Fenster ein und behält die Zwischenablage als Sicherheitsnetz.",
     "Active method:": "Aktive Methode:",
+    "Windows SendInput": "Windows SendInput",
+    "macOS CGEvent": "macOS CGEvent",
+    "Wayland portal": "Wayland-Portal",
+    "wtype": "wtype",
+    "X11 XTEST": "X11 XTEST",
+    "Clipboard (install wtype or grant the portal)":
+        "Zwischenablage (wtype installieren oder Portal freigeben)",
     "Automatic (paste, else clipboard)": "Automatisch (Einfügen, sonst Zwischenablage)",
     "Clipboard restore delay:": "Verzögerung beim Wiederherstellen:",
     "Recording indicator": "Aufnahme-Anzeige",
@@ -402,4 +409,68 @@ DE: dict[str, str] = {
         "Tastatursteuerung freigegeben. Text wird jetzt direkt eingefügt.",
     "Keyboard control was not granted. Voicewright falls back to wtype or the clipboard.":
         "Tastatursteuerung wurde nicht freigegeben. Voicewright nutzt stattdessen wtype oder die Zwischenablage.",
+    # --- setup assistant --------------------------------------------------
+    "Setup assistant": "Einrichtungsassistent",
+    "Setup assistant…": "Einrichtungsassistent…",
+    "Open setup assistant": "Einrichtungsassistent öffnen",
+    "Setup complete. Voicewright is ready.": "Einrichtung abgeschlossen. Voicewright ist bereit.",
+    "Microphone level": "Mikrofonpegel",
+    "PortAudio is not available": "PortAudio ist nicht verfügbar",
+    "Welcome to Voicewright": "Willkommen bei Voicewright",
+    "Local dictation for Fedora, Windows and macOS – no account, no cloud required.":
+        "Lokales Diktat für Fedora, Windows und macOS – kein Konto, keine Cloud nötig.",
+    "Speak naturally and let Voicewright type into the active window.":
+        "Sprich natürlich und lass Voicewright in das aktive Fenster schreiben.",
+    "Speech recognition runs entirely on this computer.":
+        "Die Spracherkennung läuft vollständig auf diesem Computer.",
+    "One shortcut handles tap-to-toggle and hold-to-talk.":
+        "Ein Tastenkürzel übernimmt Tippen zum Umschalten und Halten zum Sprechen.",
+    "Cloud cleanup and history are opt-in and off by default.":
+        "Cloud-Bereinigung und Verlauf sind optional und standardmäßig aus.",
+    "This assistant takes about two minutes. You can skip any step and reopen it later.":
+        "Dieser Assistent dauert etwa zwei Minuten. Du kannst jeden Schritt überspringen und ihn später erneut öffnen.",
+    "Choose a speech model": "Sprachmodell wählen",
+    "Downloads start only when you click the button. Every file is checked by size and SHA-256.":
+        "Downloads starten erst auf Knopfdruck. Jede Datei wird per Größe und SHA-256 geprüft.",
+    "needs sherpa-onnx": "benötigt sherpa-onnx",
+    "Download and use": "Herunterladen und verwenden",
+    "Recommended for this computer:": "Empfohlen für diesen Computer:",
+    "Test your microphone": "Mikrofon testen",
+    "Speak a sentence. The bar should move while you talk; nothing is recorded or uploaded.":
+        "Sprich einen Satz. Der Balken sollte sich bewegen; nichts wird aufgenommen oder hochgeladen.",
+    "Start microphone test": "Mikrofon-Test starten",
+    "Stop microphone test": "Mikrofon-Test beenden",
+    "Listening… speak now.": "Höre zu… sprich jetzt.",
+    "Microphone unavailable:": "Mikrofon nicht verfügbar:",
+    "Shortcut and insertion": "Tastenkürzel und Einfügen",
+    "Check the shortcut and paste a test sentence into the field below.":
+        "Prüfe das Kürzel und füge einen Testsatz in das Feld unten ein.",
+    "Insertion method:": "Einfügemethode:",
+    "The test text appears here": "Der Testtext erscheint hier",
+    "Test insertion": "Einfügen testen",
+    "Step {n} of {total}": "Schritt {n} von {total}",
+    "Finish": "Fertig",
+    "Tip: speak normally at the distance you will use later.":
+        "Tipp: Sprich normal in dem Abstand, den du später verwendest.",
+    "This model needs the sherpa-onnx package. Choose a Whisper model instead.":
+        "Dieses Modell benötigt das Paket sherpa-onnx. Wähle stattdessen ein Whisper-Modell.",
+    "Already downloaded": "Bereits heruntergeladen",
+    "Active model:": "Aktives Modell:",
+    "Downloading…": "Wird heruntergeladen…",
+    "Model downloaded and selected:": "Modell heruntergeladen und ausgewählt:",
+    "Shortcut saved.": "Kürzel gespeichert.",
+    "The rewrite shortcut overlaps the dictation shortcut and stays off.":
+        "Das Umschreib-Kürzel überlappt das Diktat-Kürzel und bleibt aus.",
+    "The rewrite shortcut overlaps dictation and stays off. Choose another one.":
+        "Das Umschreib-Kürzel überlappt das Diktat und bleibt aus. Wähle ein anderes.",
+    "Paste requested. The text should appear in the field.":
+        "Einfügen angefordert. Der Text sollte im Feld erscheinen.",
+    "Voicewright insertion test": "Voicewright Einfüge-Test",
+    "Back": "Zurück",
+    "Skip for now": "Vorerst überspringen",
+    "Next": "Weiter",
+    "Test microphone…": "Mikrofon testen…",
+    "Rewrite shortcut saved:": "Kürzel zum Umschreiben gespeichert:",
+    "Requires sherpa-onnx": "Benötigt sherpa-onnx",
+    "Granted (saved)": "Freigegeben (gespeichert)",
 }

@@ -27,11 +27,15 @@ class Injector(QObject):
     def __init__(self, config: Config) -> None:
         super().__init__()
         self.config = config
-        self.portal = RemoteDesktopPortal()
+        self.portal = RemoteDesktopPortal(on_restore_token=self._store_restore_token)
         self._saved_clipboard: str | None = None
+        self._inserted_text: str | None = None
         self._restore_timer = QTimer(self)
         self._restore_timer.setSingleShot(True)
         self._restore_timer.timeout.connect(self._restore_clipboard)
+
+    def _store_restore_token(self, token: str) -> None:
+        self.config.set("wayland_restore_token", token)
 
     # ------------------------------------------------------------------
     def _wants_portal(self) -> bool:
@@ -44,8 +48,11 @@ class Injector(QObject):
 
     def _delay_ms(self) -> int:
         # A short delay lets the clipboard owner publish the new content before
-        # the target application reads it.
-        return 70 if IS_LINUX else 40
+        # the target application reads it. Windows and X11 need more time than
+        # macOS because the clipboard hand-off goes through the OS.
+        if IS_MACOS:
+            return 40
+        return 120 if IS_WINDOWS else 80
 
     # ------------------------------------------------------------------
     def insert(self, text: str) -> None:
@@ -80,7 +87,14 @@ class Injector(QObject):
             return
 
         # Paste path: clipboard + simulated shortcut.
+        # Finish a pending restore first; otherwise the new insert would save
+        # the previous dictation as "previous clipboard" and lose the content
+        # the user had before either dictation.
+        if self._restore_timer.isActive():
+            self._restore_timer.stop()
+            self._restore_clipboard()
         self._saved_clipboard = clipboard.text()
+        self._inserted_text = text
         clipboard.setText(text)
         QTimer.singleShot(self._delay_ms(), lambda: self._do_paste(text))
 
@@ -116,17 +130,15 @@ class Injector(QObject):
 
     def _restore_clipboard(self) -> None:
         clipboard = QGuiApplication.clipboard()
-        if clipboard is None:
+        saved, inserted = self._saved_clipboard, self._inserted_text
+        self._saved_clipboard = None
+        self._inserted_text = None
+        if clipboard is None or saved is None:
             return
         current = clipboard.text()
-        saved = self._saved_clipboard
-        self._saved_clipboard = None
-        if saved is None or current != saved:
+        if inserted is not None and current != inserted:
             # The user copied something in the meantime: never overwrite it.
-            if saved is not None and current.rstrip() == saved.rstrip():
-                pass
-            else:
-                return
+            return
         clipboard.setText(saved)
 
     # ------------------------------------------------------------------
@@ -137,6 +149,27 @@ class Injector(QObject):
             self.permission_hint.emit(
                 "Wayland keyboard control was not granted. Voicewright will use "
                 "wtype or the clipboard instead.")
+        return ok
+
+    def restore_portal(self, timeout: float = 8.0) -> bool:
+        """Reconnect with the stored restore token at startup.
+
+        A valid token restores the session without another consent dialog.
+        The portal contract says a revoked token is ignored and the compositor
+        may ask again; if that dialog is declined or times out, the stale token
+        is cleared so the next start does not keep retrying it.
+        """
+        if not self._wants_portal():
+            return False
+        token = str(self.config.get("wayland_restore_token", "") or "")
+        if not token:
+            return False
+        ok = self.portal.connect(timeout, restore_token=token)
+        if ok:
+            self.config.set("wayland_consent", True)
+        else:
+            log.info("Stored Wayland permission is no longer valid; clearing token")
+            self.config.set("wayland_restore_token", "")
         return ok
 
     def describe_method(self) -> str:
