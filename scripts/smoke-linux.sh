@@ -51,7 +51,7 @@ pactl info >/dev/null || { cat "$scratch/pulse.log"; exit 1; }
 tar -xzf "$archive" -C "$scratch"
 bash "$scratch/Voicewright/install.sh"
 app="$HOME/.local/bin/voicewright"
-version=$(PYTHONPATH=src python3.11 -c 'from voicewright import __version__; print(__version__)')
+version=$(PYTHONPATH=src "${VOICEWRIGHT_PYTHON:-python3}" -c 'from voicewright import __version__; print(__version__)')
 [[ "$("$app" --version)" == "Voicewright $version" ]]
 "$app" >"$scratch/startup.log" 2>&1 &
 app_pid=$!
