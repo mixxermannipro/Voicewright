@@ -21,7 +21,7 @@ jobs:
       - name: Install Fedora test dependencies
         run: |
           dnf -y --setopt=install_weak_deps=False install git tar gzip findutils util-linux-core \
-            python3.11 python3.11-devel gcc kernel-headers portaudio xcb-util-cursor xcb-util-keysyms xcb-util-wm \
+            python3.14 python3.14-devel gcc kernel-headers portaudio xcb-util-cursor xcb-util-keysyms xcb-util-wm \
             libxkbcommon-x11 libglvnd-egl mesa-libGL xorg-x11-server-Xvfb xauth xclip \
             espeak-ng pulseaudio pulseaudio-utils alsa-plugins-pulseaudio
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
@@ -29,7 +29,7 @@ jobs:
           persist-credentials: false
       - name: Check Python source
         run: |
-          python3.11 -m venv .venv
+          python3.14 -m venv .venv
           . .venv/bin/activate
           python -m pip install -r requirements.txt pytest
           python -m pip check
@@ -47,5 +47,76 @@ jobs:
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: voicewright-linux-x86_64
+          path: release/
+          if-no-files-found: error
+
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 35
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - name: Set up Python 3.11
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+          python -m pip check
+      - name: Run tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m pytest -q
+      - name: Build the windowed executable
+        run: python -m PyInstaller --noconfirm --clean voicewright.spec
+      - name: Smoke-test the executable
+        run: |
+          $process = Start-Process -FilePath "dist\Voicewright\Voicewright.exe" `
+            -ArgumentList "--selftest" -Wait -PassThru
+          if ($process.ExitCode -ne 0) {
+            throw "Voicewright.exe --selftest failed with exit code $($process.ExitCode)"
+          }
+          Write-Host "Voicewright.exe --selftest passed"
+      - name: Package portable ZIP and installer
+        run: |
+          $version = python -c "import sys; sys.path.insert(0, 'src'); from voicewright import __version__; print(__version__)"
+          if (-not $version) { throw "Could not read the version" }
+          New-Item -ItemType Directory -Force -Path release | Out-Null
+          $zip = "release\Voicewright-$version-windows-x64.zip"
+          Compress-Archive -Path "dist\Voicewright\*" -DestinationPath $zip -Force
+
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup --no-progress -y
+            $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          }
+          if (-not (Test-Path $iscc)) { throw "Inno Setup 6 is not available" }
+          & $iscc "/DAppVersion=$version" "/DSourceDir=$env:GITHUB_WORKSPACE\dist\Voicewright" "/DOutputDir=$env:GITHUB_WORKSPACE\release" packaging\windows\voicewright.iss
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed" }
+          $setup = "release\Voicewright-$version-windows-x64-setup.exe"
+          if (-not (Test-Path $setup)) { throw "Installer was not created" }
+
+          $portable = Join-Path $env:RUNNER_TEMP "portable"
+          Expand-Archive -Path $zip -DestinationPath $portable -Force
+          $process = Start-Process -FilePath (Join-Path $portable "Voicewright.exe") `
+            -ArgumentList "--selftest" -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Portable executable self-test failed" }
+
+          foreach ($file in @($zip, $setup)) {
+            $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLower()
+            # LF, not CRLF: the checksum must also work with `sha256sum -c`.
+            [IO.File]::WriteAllText("$file.sha256", "$hash  $(Split-Path $file -Leaf)`n")
+          }
+          Get-ChildItem release | Format-Table Name, Length
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: voicewright-windows-x64
           path: release/
           if-no-files-found: error

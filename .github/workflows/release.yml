@@ -1,0 +1,164 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to publish, for example v2.0.0"
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    container: fedora:45
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Install Fedora build dependencies
+        run: |
+          dnf -y --setopt=install_weak_deps=False install git tar gzip findutils util-linux-core \
+            python3.14 python3.14-devel gcc kernel-headers portaudio xcb-util-cursor xcb-util-keysyms xcb-util-wm \
+            libxkbcommon-x11 libglvnd-egl mesa-libGL xorg-x11-server-Xvfb xauth xclip \
+            espeak-ng pulseaudio pulseaudio-utils alsa-plugins-pulseaudio
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+          # A manual run must build the selected tag, not the branch HEAD.
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+      - name: Test and build the Fedora package
+        run: |
+          python3.14 -m venv .venv
+          . .venv/bin/activate
+          python -m pip install -r requirements.txt pytest
+          python -m pip check
+          python -m pytest -q
+          PYTHONPATH=src xvfb-run -a python scripts/smoke-whisper.py "$RUNNER_TEMP/model"
+          bash scripts/build-linux.sh
+          runuser -u nobody -- xvfb-run -a bash scripts/smoke-linux.sh \
+            release/Voicewright-*-linux-x86_64.tar.gz "$RUNNER_TEMP/model"
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: voicewright-release-linux
+          path: release/
+          if-no-files-found: error
+
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+      - name: Set up Python 3.11
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Test and build the Windows package
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+          python -m pip check
+          $env:QT_QPA_PLATFORM = "offscreen"
+          python -m pytest -q
+          python -m PyInstaller --noconfirm --clean voicewright.spec
+
+          $version = python -c "import sys; sys.path.insert(0, 'src'); from voicewright import __version__; print(__version__)"
+          if (-not $version) { throw "Could not read the version" }
+          $process = Start-Process -FilePath "dist\Voicewright\Voicewright.exe" `
+            -ArgumentList "--selftest" -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Voicewright.exe --selftest failed" }
+
+          New-Item -ItemType Directory -Force -Path release | Out-Null
+          $zip = "release\Voicewright-$version-windows-x64.zip"
+          Compress-Archive -Path "dist\Voicewright\*" -DestinationPath $zip -Force
+
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup --no-progress -y
+            $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          }
+          if (-not (Test-Path $iscc)) { throw "Inno Setup 6 is not available" }
+          & $iscc "/DAppVersion=$version" "/DSourceDir=$env:GITHUB_WORKSPACE\dist\Voicewright" "/DOutputDir=$env:GITHUB_WORKSPACE\release" packaging\windows\voicewright.iss
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed" }
+          $setup = "release\Voicewright-$version-windows-x64-setup.exe"
+          if (-not (Test-Path $setup)) { throw "Installer was not created" }
+
+          $portable = Join-Path $env:RUNNER_TEMP "portable"
+          Expand-Archive -Path $zip -DestinationPath $portable -Force
+          $process = Start-Process -FilePath (Join-Path $portable "Voicewright.exe") `
+            -ArgumentList "--selftest" -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Portable executable self-test failed" }
+
+          foreach ($file in @($zip, $setup)) {
+            $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLower()
+            # LF, not CRLF: the checksum must also work with `sha256sum -c`.
+            [IO.File]::WriteAllText("$file.sha256", "$hash  $(Split-Path $file -Leaf)`n")
+          }
+          Get-ChildItem release | Format-Table Name, Length
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: voicewright-release-windows
+          path: release/
+          if-no-files-found: error
+
+  publish:
+    needs: [linux, windows]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+      - name: Download Linux package
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53
+        with:
+          name: voicewright-release-linux
+          path: release
+      - name: Download Windows package
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53
+        with:
+          name: voicewright-release-windows
+          path: release
+      - name: Publish the verified release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="$RELEASE_TAG"
+          version="${tag#v}"
+          test -n "$version"
+          test -f "release/Voicewright-${version}-linux-x86_64.tar.gz"
+          test -f "release/Voicewright-${version}-linux-x86_64.tar.gz.sha256"
+          test -f "release/Voicewright-${version}-windows-x64.zip"
+          test -f "release/Voicewright-${version}-windows-x64.zip.sha256"
+          test -f "release/Voicewright-${version}-windows-x64-setup.exe"
+          test -f "release/Voicewright-${version}-windows-x64-setup.exe.sha256"
+          sed "s/__VERSION__/${version}/g" docs/release-notes-template.md > "$RUNNER_TEMP/notes.md"
+          ls -lh release
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" release/* --clobber
+            gh release edit "$tag" --title "Voicewright $version" --notes-file "$RUNNER_TEMP/notes.md"
+          else
+            gh release create "$tag" release/* \
+              --verify-tag \
+              --title "Voicewright $version" \
+              --notes-file "$RUNNER_TEMP/notes.md"
+          fi
